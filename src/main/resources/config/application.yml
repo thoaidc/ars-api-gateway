@@ -12,145 +12,133 @@
 # ===================================================================
 
 server:
-  servlet:
-    session:
-      cookie:
-        # The session cookie that Spring Boot creates will have the HttpOnly attribute
-        # Setting HttpOnly helps protect cookies from Cross-Site Scripting (XSS) attacks
-        # Cookies will still be sent with each HTTP request (and can therefore be used for session authentication)
-        # But Cookies cannot be accessed from the client side using JavaScript (e.g. via document.cookie)
-        http-only: true
   port: 8080
   shutdown: graceful
 
 spring:
   application:
-    name: api-gateway
+    name: ars-api-gateway
   profiles:
     active: "@profiles.active@"
+  lifecycle:
+    timeout-per-shutdown-phase: 10s
+
+  webflux:
+    multipart:
+      max-in-memory-size: 2MB
+      max-disk-usage-per-part: 15MB
+      max-parts: 64
 
   cloud:
     gateway:
-      # Global CORS configuration
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins:
-              - "http://localhost:4200"
-              - "http://localhost:8080"
-            allowedMethods:
+      # Global request filters
+      default-filters:
+        - AddRequestHeader=X-API-Version, v1
+        - AddResponseHeader=Cache-Control, public, max-age=300
+        - name: RequestRateLimiter # The name of the filter built into Spring Gateway, cannot be changed
+          args:
+            redis-rate-limiter.replenishRate: 5
+            redis-rate-limiter.burstCapacity: 10
+            redis-rate-limiter.requestedTokens: 1
+            key-resolver: "#{@compositeKeyResolver}"
+            deny-empty-key: false
+            empty-key-status: TOO_MANY_REQUESTS
+        - name: CircuitBreaker # The name of the filter built into Spring Gateway, cannot be changed
+          args:
+            name: service-cb
+            fallbackUri: forward:/fallback/services/unavailable
+            statusCodes:
+              - 500
+              - 502
+              - 503
+            slowCallDurationThreshold: 5000ms
+            slowCallRateThreshold: 75
+        - name: Retry # The name of the filter built into Spring Gateway, cannot be changed
+          args:
+            retries: 5
+            statuses:
+              - BAD_GATEWAY
+              - SERVICE_UNAVAILABLE
+            methods:
               - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - OPTIONS
-            allowedHeaders:
-              - Content-Type
-              - Authorization
-              - Accept
-              - Origin
-              - X-CSRF-Token
-              - X-Requested-With
-              - Access-Control-Allow-Origin
-              - X-App-Version
-              - X-Device-ID
-            allowCredentials: true
-            maxAge: 3600  # Cache preflight response in 1 hour
+            backoff:
+              firstBackoff: 100ms
+              maxBackoff: 1000ms
+              factor: 2
+              basedOnPreviousValue: false
 
       # Route configurations
       routes:
-        # User Service Route
-        - id: user-service
-          uri: lb://USER-SERVICE
+        - id: chat-service-websocket-route
+          uri: lb:ws://chat-service
           predicates:
-            - Path=/api/users/**
+            - Path=/ws/**
           filters:
-            - StripPrefix=2
-            - name: CircuitBreaker
-              args:
-                name: user-service-cb
-                fallbackUri: forward:/fallback/users
-            - name: RequestRateLimiter
-              args:
-                redis-rate-limiter:
-                  replenish-rate: 10
-                  burst-capacity: 20
-                  requested-tokens: 1
+            - StripPrefix=1
 
-        # Product Service Route
-        - id: product-service
-          uri: lb://PRODUCT-SERVICE
+        - id: user-service-route
+          uri: lb://user-service
           predicates:
-            - Path=/api/products/**
+            - Path=/user-service/**
+            - Method=GET,POST,PUT,PATCH,DELETE
           filters:
-            - StripPrefix=2
-            - name: CircuitBreaker
+            - StripPrefix=1
+            - name: RequestSize # The name of the filter built into Spring Gateway, cannot be changed
               args:
-                name: product-service-cb
-                fallbackUri: forward:/fallback/products
-            - AddRequestHeader=X-Gateway-Name, API-Gateway
-
-        # Order Service Route with authentication
-        - id: order-service
-          uri: lb://ORDER-SERVICE
-          predicates:
-            - Path=/api/orders/**
-            - Header=Authorization, Bearer.*
-          filters:
-            - StripPrefix=2
-            - name: CircuitBreaker
-              args:
-                name: order-service-cb
-                fallbackUri: forward:/fallback/orders
+                maxSize: 5MB
 
       # Load balancer configuration
       loadbalancer:
         use404: true
 
-      # Discovery configuration
-      discovery:
-        locator:
-          enabled: true # Automatically create routes from service discovery
-          lower-case-service-id: true
-  lifecycle:
-    timeout-per-shutdown-phase: 5s
+      # Metrics configuration
+      metrics:
+        enabled: true
+        tags:
+          path:
+            enabled: true
+          application: ${spring.application.name}
+          environment: ${spring.profiles.active}
+      observability:
+        enabled: true
 
 resilience4j:
   circuitbreaker:
     instances:
-      user-service-cb:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
+      service-cb:
+        slidingWindowType: COUNT_BASED
+        slowCallDurationThreshold: 5s # If request call > 5s → considered slow
+        slowCallRateThreshold: 75     # If ≥75% of calls are delayed → open circuit
+        registerHealthIndicator: true # Allows exposing circuit breaker status via actuator /actuator/health
+        slidingWindowSize: 10     # Use a sliding window of size 10 most recent calls to calculate the error
+        minimumNumberOfCalls: 5   # Only start evaluating errors after at least 5 requests
+        # When circuit breaker opens → after timeout → switches to half-open state, allowing 3 retry requests for testing
         permittedNumberOfCallsInHalfOpenState: 3
+        # After waitDurationInOpenState, automatically switch from open to half-open (no new request required)
         automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 5s
-        failureRateThreshold: 50
-        eventConsumerBufferSize: 10
-
-      product-service-cb:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        minimumNumberOfCalls: 5
-        failureRateThreshold: 60
-        waitDurationInOpenState: 10s
-
-      order-service-cb:
-        registerHealthIndicator: true
-        slidingWindowSize: 15
-        minimumNumberOfCalls: 8
-        failureRateThreshold: 40
-        waitDurationInOpenState: 8s
+        waitDurationInOpenState: 5s   # When circuit is open, wait 5s before allowing retry
+        failureRateThreshold: 50      # If error rate > 50% in slidingWindowSize → open circuit (disconnect)
+        eventConsumerBufferSize: 10   # Circuit breaker status event log buffer (for monitoring, logging)
 
 # Actuator endpoints
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway,metrics
+        include:
+          - health
+          - info
+          - metrics
+          - gateway
+          - resilience4j.circuitbreakers
   endpoint:
     gateway:
       enabled: true
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
     health:
       show-details: always
+  server:
+    port: 8888

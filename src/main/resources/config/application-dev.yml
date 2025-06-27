@@ -21,6 +21,36 @@ logging:
   # Custom properties to define logs file paths according to different profiles
   file-path: mnt/logs
 
+spring:
+  cloud:
+    gateway:
+      # Global CORS configuration
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:4200"
+              - "http://localhost:8080"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - Content-Type
+              - Authorization
+              - Accept
+              - Origin
+              - X-CSRF-Token
+              - X-Requested-With
+              - Access-Control-Allow-Origin
+              - X-App-Version
+              - X-Device-ID
+            allowCredentials: true
+            maxAge: 3600  # Cache preflight response in 1 hour
+
 # Eureka client configuration
 eureka:
   client:
