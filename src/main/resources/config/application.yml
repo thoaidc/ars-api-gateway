@@ -77,7 +77,7 @@ spring:
             - StripPrefix=1
 
         - id: user-service-route
-          uri: lb://user-service
+          uri: lb://USER-SERVICE
           predicates:
             - Path=/user-service/**
             - Method=GET,POST,PUT,PATCH,DELETE
@@ -130,7 +130,8 @@ management:
           - info
           - metrics
           - gateway
-          - resilience4j.circuitbreakers
+          - circuitbreakers
+          - redis
   endpoint:
     gateway:
       enabled: true
