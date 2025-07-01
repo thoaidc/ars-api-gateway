@@ -8,4 +8,5 @@ package com.ars.gateway.constants;
 public interface PropertiesConstants {
     String RATE_LIMIT_CONFIG = "ars.gateway.rate-limiter";
     String AUTHENTICATION_CACHE_CONFIG = "ars.gateway.security.cache";
+    String SECURITY_REQUEST_CONFIG = "ars.gateway.security.request";
 }

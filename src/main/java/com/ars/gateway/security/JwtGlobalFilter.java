@@ -1,6 +1,8 @@
 package com.ars.gateway.security;
 
+import com.ars.gateway.common.Common;
 import com.ars.gateway.config.properties.AuthenticationCacheProps;
+import com.ars.gateway.config.properties.PublicEndpointProps;
 import com.dct.model.common.JsonUtils;
 import com.dct.model.constants.BaseHttpStatusConstants;
 import com.dct.model.constants.BaseSecurityConstants;
@@ -24,6 +26,7 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -32,14 +35,13 @@ import reactor.core.scheduler.Schedulers;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
-@EnableConfigurationProperties(AuthenticationCacheProps.class)
+@EnableConfigurationProperties({AuthenticationCacheProps.class, PublicEndpointProps.class})
 public class JwtGlobalFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(JwtGlobalFilter.class);
@@ -48,26 +50,19 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
     private final AuthenticationCacheProps authCacheConfig;
-
-    // Các pattern không cần authentication
-    private final List<String> publicPatterns = Arrays.asList(
-            "/auth/**",           // Auth service endpoints
-            "/oauth2/**",         // OAuth2 endpoints
-            "/public/**",         // Public APIs
-            "/actuator/**",       // Health check
-            "/fallback/**",       // Fallback endpoints
-            "/favicon.ico",
-            "/error"
-    );
+    private final PublicEndpointProps publicEndpointConfig;
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public JwtGlobalFilter(BaseJwtProvider jwtProvider,
                            RedisTemplate<String, String> redisTemplate,
                            ObjectMapper objectMapper,
-                           AuthenticationCacheProps authCacheConfig) {
+                           AuthenticationCacheProps authCacheConfig,
+                           PublicEndpointProps publicEndpointConfig) {
         this.jwtProvider = jwtProvider;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.authCacheConfig = authCacheConfig;
+        this.publicEndpointConfig = publicEndpointConfig;
     }
 
     @Override
@@ -83,9 +78,9 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
         }
 
         // Extract JWT token
-        String token = retrieveTokenFromHeader(request);
+        String token = org.apache.commons.lang.StringUtils.trimToNull(retrieveTokenFromHeader(request));
 
-        if (token == null) {
+        if (Objects.isNull(token)) {
             log.warn("[{}] - Missing token for protected endpoint: {}", ENTITY_NAME, path);
             return handleUnauthorized(exchange, "Authentication token required");
         }
@@ -112,8 +107,18 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
             .onErrorResume(error -> handleUnauthorized(exchange, error));
     }
 
-    private boolean isPublicEndpoint(String path) {
-        return publicPatterns.stream().anyMatch(pattern -> (path.equals(pattern) || path.startsWith(pattern)));
+    private boolean isPublicEndpoint(String fullPath) {
+        fullPath = Common.normalizePath(fullPath);
+
+        if (Objects.isNull(fullPath))
+            return false;
+
+        int firstSlashIndex = fullPath.indexOf('/'); // Remove first segment (that is serviceId before pass to route)
+        String path = (firstSlashIndex > 0) ? fullPath.substring(firstSlashIndex) : fullPath;
+
+        return publicEndpointConfig.getPublicPatterns()
+                .stream()
+                .anyMatch(pattern -> pathMatcher.match(pattern, path));
     }
 
     private String retrieveTokenFromHeader(ServerHttpRequest request) {

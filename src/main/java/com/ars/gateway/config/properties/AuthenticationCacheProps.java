@@ -2,6 +2,7 @@ package com.ars.gateway.config.properties;
 
 import com.ars.gateway.constants.PropertiesConstants;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.StringUtils;
 
 @ConfigurationProperties(prefix = PropertiesConstants.AUTHENTICATION_CACHE_CONFIG)
 public class AuthenticationCacheProps {
@@ -31,6 +32,8 @@ public class AuthenticationCacheProps {
     }
 
     public void setKeyPrefix(String keyPrefix) {
-        this.keyPrefix = keyPrefix;
+        if (StringUtils.hasText(keyPrefix)) {
+            this.keyPrefix = keyPrefix;
+        }
     }
 }

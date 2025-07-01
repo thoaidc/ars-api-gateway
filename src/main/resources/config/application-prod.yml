@@ -99,3 +99,25 @@ ars:
         - "::1"
         - "host.docker.internal"
       excluded-ip-prefixes: []
+
+    security:
+      request:
+        public-patterns:
+          - /api/p
+          - /api/v1/p
+
+dct:
+  base:
+    security:
+      jwt:
+        enabled: true
+        base64-secret-key: ${ARS_GATEWAY_SECURITY_KEY}
+        access-token:
+          validity: 300000 # 5 minutes
+        refresh-token:
+          validity: 3600000 # 1 hour
+          validity-for-remember: 604800000 # 7 days
+    i18n:
+      base-names:
+        - classpath:i18n/messages
+      encoding: UTF-8
