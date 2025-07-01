@@ -1,10 +1,11 @@
 package com.ars.gateway.config.properties;
 
+import com.ars.gateway.constants.PropertiesConstants;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
 
-@ConfigurationProperties(prefix = "ars.gateway.rate-limiter")
+@ConfigurationProperties(prefix = PropertiesConstants.RATE_LIMIT_CONFIG)
 public class RateLimiterProps {
 
     private boolean ipValidationEnabled = true;

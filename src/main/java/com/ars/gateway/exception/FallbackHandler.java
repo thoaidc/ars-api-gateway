@@ -1,4 +1,4 @@
-package com.ars.gateway.filter;
+package com.ars.gateway.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
