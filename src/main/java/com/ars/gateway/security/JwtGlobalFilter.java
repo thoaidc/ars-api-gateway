@@ -1,0 +1,195 @@
+package com.ars.gateway.security;
+
+import com.ars.gateway.config.properties.AuthenticationCacheProps;
+import com.dct.model.common.JsonUtils;
+import com.dct.model.constants.BaseHttpStatusConstants;
+import com.dct.model.constants.BaseSecurityConstants;
+import com.dct.model.dto.auth.UserDTO;
+import com.dct.model.dto.response.BaseResponseDTO;
+import com.dct.model.security.BaseJwtProvider;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.core.Ordered;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.server.ServerWebExchange;
+
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Component
+@EnableConfigurationProperties(AuthenticationCacheProps.class)
+public class JwtGlobalFilter implements GlobalFilter, Ordered {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtGlobalFilter.class);
+    private static final String ENTITY_NAME = "JwtGlobalFilter";
+    private final BaseJwtProvider jwtProvider;
+    private final RedisTemplate<String, String> redisTemplate;
+    private final ObjectMapper objectMapper;
+    private final AuthenticationCacheProps authCacheConfig;
+
+    // Các pattern không cần authentication
+    private final List<String> publicPatterns = Arrays.asList(
+            "/auth/**",           // Auth service endpoints
+            "/oauth2/**",         // OAuth2 endpoints
+            "/public/**",         // Public APIs
+            "/actuator/**",       // Health check
+            "/fallback/**",       // Fallback endpoints
+            "/favicon.ico",
+            "/error"
+    );
+
+    public JwtGlobalFilter(BaseJwtProvider jwtProvider,
+                           RedisTemplate<String, String> redisTemplate,
+                           ObjectMapper objectMapper,
+                           AuthenticationCacheProps authCacheConfig) {
+        this.jwtProvider = jwtProvider;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.authCacheConfig = authCacheConfig;
+    }
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        ServerHttpRequest request = exchange.getRequest();
+        String path = request.getPath().value();
+        log.debug("[{}] - Processing request: {} {}", ENTITY_NAME, request.getMethod(), path);
+
+        // Skip authentication cho public endpoints
+        if (isPublicEndpoint(path)) {
+            log.debug("[{}] - Public endpoint, skipping authentication: {}", ENTITY_NAME, path);
+            return chain.filter(exchange);
+        }
+
+        // Extract JWT token
+        String token = retrieveTokenFromHeader(request);
+
+        if (token == null) {
+            log.warn("[{}] - Missing token for protected endpoint: {}", ENTITY_NAME, path);
+            return handleUnauthorized(exchange, "Authentication token required");
+        }
+
+        // Validate token và extract user info
+        return validateToken(token).flatMap(authentication -> {
+                log.debug("[{}] - Authentication successful for user: {}", ENTITY_NAME, authentication.getName());
+                UserDTO userDTO = (UserDTO) authentication.getPrincipal();
+                Set<String> userPermissions = userDTO.getAuthorities()
+                        .stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .filter(StringUtils::hasText)
+                        .collect(Collectors.toSet());
+
+                // Add user info vào headers để forward cho downstream services
+                ServerHttpRequest mutatedRequest = request.mutate()
+                        .header("X-User-Id", String.valueOf(userDTO.getId()))
+                        .header("X-User-Name", userDTO.getUsername())
+                        .header("X-User-Permissions", JsonUtils.toJsonString(userPermissions))
+                        .build();
+
+                return chain.filter(exchange.mutate().request(mutatedRequest).build());
+            })
+            .onErrorResume(error -> handleUnauthorized(exchange, error));
+    }
+
+    private boolean isPublicEndpoint(String path) {
+        return publicPatterns.stream().anyMatch(pattern -> (path.equals(pattern) || path.startsWith(pattern)));
+    }
+
+    private String retrieveTokenFromHeader(ServerHttpRequest request) {
+        // Extract from Authorization header
+        String authHeader = request.getHeaders().getFirst(BaseSecurityConstants.HEADER.AUTHORIZATION_HEADER);
+
+        if (StringUtils.hasText(authHeader) && authHeader.startsWith(BaseSecurityConstants.HEADER.TOKEN_TYPE)) {
+            return authHeader.substring(BaseSecurityConstants.HEADER.TOKEN_TYPE.length());
+        }
+
+        // Extract from query parameter (for WebSocket)
+        return request.getQueryParams().getFirst("token");
+    }
+
+    private Mono<Authentication> validateToken(String token) {
+        if (authCacheConfig.isEnabled()) {
+            return getCachedAuthentication(token).switchIfEmpty(
+                // If not in cache, validate token and cache result
+                Mono.fromCallable(() -> jwtProvider.validateToken(token))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .doOnNext(authentication -> cacheAuthentication(token, authentication))
+            );
+        }
+
+        return Mono.fromCallable(() -> jwtProvider.validateToken(token)).subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private Mono<Authentication> getCachedAuthentication(String token) {
+        return Mono.fromCallable(() -> {
+                String tokenCacheKey = Optional.ofNullable(authCacheConfig.getKeyPrefix()).orElse("jwt:");
+                String cachedData = redisTemplate.opsForValue().get(tokenCacheKey + token.hashCode());
+
+                if (StringUtils.hasText(cachedData)) {
+                    return objectMapper.readValue(cachedData, Authentication.class);
+                }
+
+                return null;
+            })
+            .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private void cacheAuthentication(String token, Authentication authentication) {
+        try {
+            String tokenCacheKeyPrefix = Optional.ofNullable(authCacheConfig.getKeyPrefix()).orElse("jwt:");
+            String tokenCacheKey = tokenCacheKeyPrefix + token.hashCode();
+            String authData = objectMapper.writeValueAsString(authentication);
+            redisTemplate.opsForValue().set(tokenCacheKey, authData, Duration.ofMinutes(authCacheConfig.getTtlMinutes()));
+            log.debug("Cached authentication: {}", tokenCacheKey);
+        } catch (Exception e) {
+            log.warn("Failed to cache authentication: {}", e.getMessage());
+        }
+    }
+
+    private Mono<Void> handleUnauthorized(ServerWebExchange exchange, String message) {
+        log.error("[{}] - Authentication failed: {}", ENTITY_NAME, message);
+        ServerHttpResponse response = exchange.getResponse();
+        response.setStatusCode(HttpStatus.UNAUTHORIZED);
+        response.getHeaders().add("Content-Type", MediaType.APPLICATION_JSON_VALUE);
+
+        BaseResponseDTO responseDTO = BaseResponseDTO.builder()
+                .code(BaseHttpStatusConstants.UNAUTHORIZED)
+                .success(BaseHttpStatusConstants.STATUS.FAILED)
+                .message(message)
+                .build();
+
+        String responseBody = JsonUtils.toJsonString(responseDTO);
+        DataBuffer buffer = response.bufferFactory().wrap(responseBody.getBytes(StandardCharsets.UTF_8));
+        return response.writeWith(Mono.just(buffer));
+    }
+
+    private Mono<Void> handleUnauthorized(ServerWebExchange exchange, Throwable exception) {
+        return handleUnauthorized(exchange, exception.getMessage());
+    }
+
+    @Override
+    public int getOrder() {
+        return -100;
+    }
+}
