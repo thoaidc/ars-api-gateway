@@ -1,4 +1,4 @@
-package com.ars.gateway.exception.handler;
+package com.ars.gateway.exception;
 
 import com.dct.model.common.MessageTranslationUtils;
 import com.dct.model.constants.BaseExceptionConstants;

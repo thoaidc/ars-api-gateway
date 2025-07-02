@@ -15,6 +15,11 @@ logging:
   level:
     root: debug
     com.ars.gateway: debug
+    io.netty: info
+    io.lettuce.core.protocol: info
+    io.github.resilience4j: info
+    reactor.netty.transport: info
+
   charset:
     console: UTF-8
     file: UTF-8

@@ -4,12 +4,15 @@ import com.ars.gateway.constants.PropertiesConstants;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
+import java.util.Optional;
+
 @ConfigurationProperties(prefix = PropertiesConstants.AUTHENTICATION_CACHE_CONFIG)
 public class AuthenticationCacheProps {
 
+    private final String TOKEN_KEY_PREFIX = "jwt:auth:";
     private boolean enabled;
     private int ttlMinutes = 15;
-    private String keyPrefix = "jwt:auth:";
+    private String keyPrefix = TOKEN_KEY_PREFIX;
 
     public boolean isEnabled() {
         return enabled;
@@ -28,7 +31,7 @@ public class AuthenticationCacheProps {
     }
 
     public String getKeyPrefix() {
-        return keyPrefix;
+        return Optional.ofNullable(keyPrefix).orElse(TOKEN_KEY_PREFIX);
     }
 
     public void setKeyPrefix(String keyPrefix) {

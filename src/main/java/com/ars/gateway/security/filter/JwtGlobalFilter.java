@@ -1,4 +1,4 @@
-package com.ars.gateway.security;
+package com.ars.gateway.security.filter;
 
 import com.ars.gateway.common.Common;
 import com.ars.gateway.config.properties.AuthenticationCacheProps;
@@ -13,9 +13,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -27,12 +27,14 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
+import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Objects;
@@ -41,7 +43,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
-@EnableConfigurationProperties({AuthenticationCacheProps.class, PublicEndpointProps.class})
 public class JwtGlobalFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(JwtGlobalFilter.class);
@@ -68,7 +69,10 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
-        String path = request.getPath().value();
+        String path = Optional.ofNullable((URI) exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_REQUEST_URL_ATTR))
+                .map(URI::getPath)
+                .orElse(request.getPath().value());
+
         log.debug("[{}] - Processing request: {} {}", ENTITY_NAME, request.getMethod(), path);
 
         // Skip authentication cho public endpoints
@@ -162,8 +166,8 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
 
     private void cacheAuthentication(String token, Authentication authentication) {
         try {
-            String tokenCacheKeyPrefix = Optional.ofNullable(authCacheConfig.getKeyPrefix()).orElse("jwt:");
-            String tokenCacheKey = tokenCacheKeyPrefix + token.hashCode();
+            String tokenHash = DigestUtils.md5DigestAsHex(token.getBytes(StandardCharsets.UTF_8));
+            String tokenCacheKey = authCacheConfig.getKeyPrefix() + tokenHash;
             String authData = objectMapper.writeValueAsString(authentication);
             redisTemplate.opsForValue().set(tokenCacheKey, authData, Duration.ofMinutes(authCacheConfig.getTtlMinutes()));
             log.debug("Cached authentication: {}", tokenCacheKey);
