@@ -15,10 +15,6 @@ logging:
   level:
     root: info
     com.ars.gateway: info
-    org.springframework.cloud.gateway: info
-    org.springframework.cloud.gateway.filter: info
-    org.springframework.web.reactive: info
-    reactor.netty: info
   charset:
     console: UTF-8
     file: UTF-8
@@ -99,12 +95,14 @@ ars:
         - "::1"
         - "host.docker.internal"
       excluded-ip-prefixes: []
-
     security:
       request:
         public-patterns:
-          - /api/p
-          - /api/v1/p
+          - /*/api/p/**
+          - /*/api/v1/p/**
+    cache:
+      enabled: true
+      ttl-minutes: 5
 
 dct:
   base:

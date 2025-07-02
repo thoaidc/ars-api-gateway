@@ -19,7 +19,6 @@ logging:
     io.lettuce.core.protocol: info
     io.github.resilience4j: info
     reactor.netty.transport: info
-
   charset:
     console: UTF-8
     file: UTF-8
@@ -103,15 +102,14 @@ ars:
         - "192.168."
         - "10."
         - "172.16."
-
     security:
       request:
         public-patterns:
-          - /api/p
-          - /api/v1/p
-      cache:
-        enabled: true
-        ttl-minutes: 5
+          - /*/api/p/**
+          - /*/api/v1/p/**
+    cache:
+      enabled: true
+      ttl-minutes: 5
 
 dct:
   base:

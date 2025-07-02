@@ -32,8 +32,6 @@
         <maven.compiler-plugin.version>3.12.0</maven.compiler-plugin.version>
         <maven.resources-plugin.version>3.3.1</maven.resources-plugin.version>
         <maven.surefire-plugin.version>3.2.5</maven.surefire-plugin.version>
-        <jwt.version>0.12.3</jwt.version>
-        <jackson.datatype.version>2.15.3</jackson.datatype.version>
     </properties>
 
     <dependencies>
@@ -100,38 +98,6 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jdk8</artifactId>
-            <version>${jackson.datatype.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>${jackson.datatype.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
-            <version>${jwt.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>${jwt.version}</version>
-            <scope>runtime</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
-            <version>${jwt.version}</version>
-            <scope>runtime</scope>
         </dependency>
 
         <dependency>

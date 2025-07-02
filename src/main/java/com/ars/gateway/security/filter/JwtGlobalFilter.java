@@ -1,15 +1,16 @@
 package com.ars.gateway.security.filter;
 
+import com.ars.gateway.common.CacheUtils;
 import com.ars.gateway.common.Common;
-import com.ars.gateway.config.properties.AuthenticationCacheProps;
+import com.ars.gateway.common.SecurityUtils;
+import com.ars.gateway.config.properties.CacheProps;
 import com.ars.gateway.config.properties.PublicEndpointProps;
+
 import com.dct.model.common.JsonUtils;
 import com.dct.model.constants.BaseHttpStatusConstants;
-import com.dct.model.constants.BaseSecurityConstants;
 import com.dct.model.dto.auth.UserDTO;
 import com.dct.model.dto.response.BaseResponseDTO;
 import com.dct.model.security.BaseJwtProvider;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +19,6 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.cloud.gateway.support.ServerWebExchangeUtils;
 import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
@@ -27,7 +27,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
-import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -36,7 +35,6 @@ import reactor.core.scheduler.Schedulers;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -48,21 +46,18 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
     private static final Logger log = LoggerFactory.getLogger(JwtGlobalFilter.class);
     private static final String ENTITY_NAME = "JwtGlobalFilter";
     private final BaseJwtProvider jwtProvider;
-    private final RedisTemplate<String, String> redisTemplate;
-    private final ObjectMapper objectMapper;
-    private final AuthenticationCacheProps authCacheConfig;
+    private final CacheProps cacheConfig;
+    private final CacheUtils cacheUtils;
     private final PublicEndpointProps publicEndpointConfig;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public JwtGlobalFilter(BaseJwtProvider jwtProvider,
-                           RedisTemplate<String, String> redisTemplate,
-                           ObjectMapper objectMapper,
-                           AuthenticationCacheProps authCacheConfig,
+                           CacheProps cacheConfig,
+                           CacheUtils cacheUtils,
                            PublicEndpointProps publicEndpointConfig) {
         this.jwtProvider = jwtProvider;
-        this.redisTemplate = redisTemplate;
-        this.objectMapper = objectMapper;
-        this.authCacheConfig = authCacheConfig;
+        this.cacheConfig = cacheConfig;
+        this.cacheUtils = cacheUtils;
         this.publicEndpointConfig = publicEndpointConfig;
     }
 
@@ -82,7 +77,7 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
         }
 
         // Extract JWT token
-        String token = org.apache.commons.lang.StringUtils.trimToNull(retrieveTokenFromHeader(request));
+        String token = org.apache.commons.lang.StringUtils.trimToNull(SecurityUtils.retrieveTokenFromHeader(request));
 
         if (Objects.isNull(token)) {
             log.warn("[{}] - Missing token for protected endpoint: {}", ENTITY_NAME, path);
@@ -112,68 +107,29 @@ public class JwtGlobalFilter implements GlobalFilter, Ordered {
     }
 
     private boolean isPublicEndpoint(String fullPath) {
-        fullPath = Common.normalizePath(fullPath);
+        String normalizedPath = Common.normalizePath(fullPath);
 
-        if (Objects.isNull(fullPath))
+        if (Objects.isNull(normalizedPath))
             return false;
-
-        int firstSlashIndex = fullPath.indexOf('/'); // Remove first segment (that is serviceId before pass to route)
-        String path = (firstSlashIndex > 0) ? fullPath.substring(firstSlashIndex) : fullPath;
 
         return publicEndpointConfig.getPublicPatterns()
                 .stream()
-                .anyMatch(pattern -> pathMatcher.match(pattern, path));
-    }
-
-    private String retrieveTokenFromHeader(ServerHttpRequest request) {
-        // Extract from Authorization header
-        String authHeader = request.getHeaders().getFirst(BaseSecurityConstants.HEADER.AUTHORIZATION_HEADER);
-
-        if (StringUtils.hasText(authHeader) && authHeader.startsWith(BaseSecurityConstants.HEADER.TOKEN_TYPE)) {
-            return authHeader.substring(BaseSecurityConstants.HEADER.TOKEN_TYPE.length());
-        }
-
-        // Extract from query parameter (for WebSocket)
-        return request.getQueryParams().getFirst("token");
+                .anyMatch(pattern -> pathMatcher.match(pattern, normalizedPath));
     }
 
     private Mono<Authentication> validateToken(String token) {
-        if (authCacheConfig.isEnabled()) {
-            return getCachedAuthentication(token).switchIfEmpty(
-                // If not in cache, validate token and cache result
-                Mono.fromCallable(() -> jwtProvider.validateToken(token))
+        if (cacheConfig.isEnabled()) {
+            return Mono.fromCallable(() -> cacheUtils.getCache(token, Authentication.class))
                     .subscribeOn(Schedulers.boundedElastic())
-                    .doOnNext(authentication -> cacheAuthentication(token, authentication))
-            );
+                    .switchIfEmpty(
+                        // If not in cache, validate token and cache result
+                        Mono.fromCallable(() -> jwtProvider.validateToken(token))
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .doOnNext(authentication -> cacheUtils.cache(token, authentication))
+                    );
         }
 
         return Mono.fromCallable(() -> jwtProvider.validateToken(token)).subscribeOn(Schedulers.boundedElastic());
-    }
-
-    private Mono<Authentication> getCachedAuthentication(String token) {
-        return Mono.fromCallable(() -> {
-                String tokenCacheKey = Optional.ofNullable(authCacheConfig.getKeyPrefix()).orElse("jwt:");
-                String cachedData = redisTemplate.opsForValue().get(tokenCacheKey + token.hashCode());
-
-                if (StringUtils.hasText(cachedData)) {
-                    return objectMapper.readValue(cachedData, Authentication.class);
-                }
-
-                return null;
-            })
-            .subscribeOn(Schedulers.boundedElastic());
-    }
-
-    private void cacheAuthentication(String token, Authentication authentication) {
-        try {
-            String tokenHash = DigestUtils.md5DigestAsHex(token.getBytes(StandardCharsets.UTF_8));
-            String tokenCacheKey = authCacheConfig.getKeyPrefix() + tokenHash;
-            String authData = objectMapper.writeValueAsString(authentication);
-            redisTemplate.opsForValue().set(tokenCacheKey, authData, Duration.ofMinutes(authCacheConfig.getTtlMinutes()));
-            log.debug("Cached authentication: {}", tokenCacheKey);
-        } catch (Exception e) {
-            log.warn("Failed to cache authentication: {}", e.getMessage());
-        }
     }
 
     private Mono<Void> handleUnauthorized(ServerWebExchange exchange, String message) {

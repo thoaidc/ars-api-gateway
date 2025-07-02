@@ -10,8 +10,8 @@ public class Common {
         path = StringUtils.trimToNull(path);
 
         if (Objects.nonNull(path)) {
-            // Remove any '/' characters at the beginning and end of the path
-            path = path.replaceAll("^/+", "").replaceAll("/+$", "");
+            // Remove any '/' characters at the end of the path
+            path = path.replaceAll("/+$", "");
             return StringUtils.trimToNull(path);
         }
 

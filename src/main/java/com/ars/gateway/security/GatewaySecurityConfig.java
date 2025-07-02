@@ -1,6 +1,5 @@
 package com.ars.gateway.security;
 
-import com.ars.gateway.config.properties.AuthenticationCacheProps;
 import com.ars.gateway.config.properties.PublicEndpointProps;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -15,7 +14,7 @@ import org.springframework.security.web.server.authorization.ServerAccessDeniedH
 
 @Configuration
 @EnableWebFluxSecurity
-@EnableConfigurationProperties({AuthenticationCacheProps.class, PublicEndpointProps.class})
+@EnableConfigurationProperties(PublicEndpointProps.class)
 public class GatewaySecurityConfig {
 
     private final ServerAuthenticationEntryPoint authenticationEntryPoint;
