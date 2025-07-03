@@ -10,4 +10,5 @@ public interface PropertiesConstants {
     String CACHE_CONFIG = "ars.gateway.cache";
     String ENABLED_CACHE = "ars.gateway.cache.enabled";
     String SECURITY_REQUEST_CONFIG = "ars.gateway.security.request";
+    String CORS_CONFIG = "spring.cloud.gateway.globalcors";
 }

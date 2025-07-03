@@ -1,13 +1,9 @@
 package com.ars.gateway.config.properties;
 
-import com.ars.gateway.common.Common;
 import com.ars.gateway.constants.PropertiesConstants;
-
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
 
 @ConfigurationProperties(prefix = PropertiesConstants.SECURITY_REQUEST_CONFIG)
 public class PublicEndpointProps {
@@ -16,18 +12,13 @@ public class PublicEndpointProps {
      * Global patterns - apply to entire path (including serviceId) <p>
      * Ex: /auth-service/api/p/login, /user-service/actuator/health
      */
-    private List<String> publicPatterns = new ArrayList<>();
+    private String[] publicPatterns;
 
-    public List<String> getPublicPatterns() {
+    public String[] getPublicPatterns() {
         return publicPatterns;
     }
 
-    public void setPublicPatterns(List<String> publicPatterns) {
-        if (Objects.nonNull(publicPatterns) && !publicPatterns.isEmpty()) {
-            this.publicPatterns = publicPatterns.stream()
-                    .map(Common::normalizePath)
-                    .filter(Objects::nonNull)
-                    .toList();
-        }
+    public void setPublicPatterns(String[] publicPatterns) {
+        this.publicPatterns = Optional.ofNullable(publicPatterns).orElse(new String[0]);
     }
 }
