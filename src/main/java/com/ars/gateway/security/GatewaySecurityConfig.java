@@ -3,6 +3,7 @@ package com.ars.gateway.security;
 import com.ars.gateway.config.properties.CorsProps;
 import com.ars.gateway.config.properties.PublicEndpointProps;
 import com.ars.gateway.security.filter.JwtFilter;
+import com.dct.model.config.properties.JwtProps;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -23,7 +24,7 @@ import java.util.Objects;
 
 @Configuration
 @EnableWebFluxSecurity
-@EnableConfigurationProperties({PublicEndpointProps.class, CorsProps.class})
+@EnableConfigurationProperties({PublicEndpointProps.class, JwtProps.class, CorsProps.class})
 public class GatewaySecurityConfig {
 
     private final ServerAuthenticationEntryPoint authenticationEntryPoint;

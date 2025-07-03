@@ -6,7 +6,6 @@ import com.ars.gateway.config.properties.CacheProps;
 import com.dct.model.common.JsonUtils;
 import com.dct.model.constants.BaseHttpStatusConstants;
 import com.dct.model.dto.response.BaseResponseDTO;
-import com.dct.model.security.BaseJwtProvider;
 
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
@@ -34,11 +33,11 @@ public class JwtFilter implements WebFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtFilter.class);
     private static final String ENTITY_NAME = "JwtFilter";
-    private final BaseJwtProvider jwtProvider;
+    private final JwtProvider jwtProvider;
     private final CacheProps cacheConfig;
     private final CacheUtils cacheUtils;
 
-    public JwtFilter(BaseJwtProvider jwtProvider, CacheProps cacheConfig, CacheUtils cacheUtils) {
+    public JwtFilter(JwtProvider jwtProvider, CacheProps cacheConfig, CacheUtils cacheUtils) {
         this.jwtProvider = jwtProvider;
         this.cacheConfig = cacheConfig;
         this.cacheUtils = cacheUtils;
