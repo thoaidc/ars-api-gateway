@@ -1,5 +1,7 @@
 package com.ars.gateway.security.filter;
 
+import com.ars.gateway.common.CacheUtils;
+import com.ars.gateway.config.properties.CacheProps;
 import com.dct.model.config.properties.JwtProps;
 import com.dct.model.constants.BaseExceptionConstants;
 import com.dct.model.constants.BaseSecurityConstants;
@@ -24,11 +26,14 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
 import javax.crypto.SecretKey;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -38,8 +43,12 @@ public class JwtProvider {
     private static final String ENTITY_NAME = "JwtProvider";
     protected final SecretKey secretKey;
     protected final JwtParser jwtParser;
+    private final CacheProps cacheConfig;
+    private final CacheUtils cacheUtils;
 
-    public JwtProvider(JwtProps jwtProps) {
+    public JwtProvider(JwtProps jwtProps, CacheProps cacheConfig, CacheUtils cacheUtils) {
+        this.cacheConfig = cacheConfig;
+        this.cacheUtils = cacheUtils;
         JwtProps jwtConfig = Optional.ofNullable(jwtProps).orElse(new JwtProps());
         String base64SecretKey = jwtConfig.getBase64SecretKey();
 
@@ -54,11 +63,32 @@ public class JwtProvider {
         log.debug("Sign JWT with algorithm: {}", secretKey.getAlgorithm());
     }
 
-    public Authentication validateToken(String token) {
-        log.debug("[{}] - Validate token by default config", ENTITY_NAME);
+    public Mono<Authentication> validateToken(String token) {
+        if (!StringUtils.hasText(token)) {
+            return Mono.error(new BaseBadRequestException(ENTITY_NAME, BaseExceptionConstants.BAD_CREDENTIALS));
+        }
 
-        if (!StringUtils.hasText(token))
-            throw new BaseBadRequestException(ENTITY_NAME, BaseExceptionConstants.BAD_CREDENTIALS);
+        return cacheConfig.isEnabled() ? getCachedAuthentication(token) : validateAndCache(token);
+    }
+
+    private Mono<Authentication> getCachedAuthentication(String token) {
+        return Mono.fromCallable(() -> (Authentication) cacheUtils.get(token, UsernamePasswordAuthenticationToken.class))
+                .subscribeOn(Schedulers.boundedElastic())
+                .switchIfEmpty(validateAndCache(token));
+    }
+
+    private Mono<Authentication> validateAndCache(String token) {
+        return Mono.fromCallable(() -> parseToken(token))
+                .subscribeOn(Schedulers.boundedElastic())
+                .doOnNext(authentication -> {
+                    if (cacheConfig.isEnabled()) {
+                        cacheUtils.cache(token, authentication);
+                    }
+                });
+    }
+
+    private Authentication parseToken(String token) {
+        log.debug("[{}] - Validating token using default config", ENTITY_NAME);
 
         try {
             return getAuthentication(token);
@@ -77,22 +107,23 @@ public class JwtProvider {
         throw new BaseAuthenticationException(ENTITY_NAME, BaseExceptionConstants.TOKEN_INVALID_OR_EXPIRED);
     }
 
-    public Authentication getAuthentication(String token) {
+    private UsernamePasswordAuthenticationToken getAuthentication(String token) {
         Claims claims = (Claims) jwtParser.parse(token).getPayload();
         Integer userId = (Integer) claims.get(BaseSecurityConstants.TOKEN_PAYLOAD.USER_ID);
+        String username = (String) claims.get(BaseSecurityConstants.TOKEN_PAYLOAD.USERNAME);
         String authorities = (String) claims.get(BaseSecurityConstants.TOKEN_PAYLOAD.AUTHORITIES);
 
-        if (!StringUtils.hasText(authorities)) {
-            throw new BaseAuthenticationException(ENTITY_NAME, BaseExceptionConstants.FORBIDDEN);
-        }
-
-        Collection<SimpleGrantedAuthority> userAuthorities = Arrays.stream(authorities.split(","))
+        Set<SimpleGrantedAuthority> userAuthorities = Arrays.stream(authorities.split(","))
                 .filter(StringUtils::hasText)
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toSet());
 
-        UserDTO principal = new UserDTO(claims.getSubject(), "none-password", userAuthorities);
-        principal.setId(userId);
+        UserDTO principal = UserDTO.userBuilder()
+                .withId(userId)
+                .withUsername(username)
+                .withAuthorities(userAuthorities)
+                .build();
+
         return new UsernamePasswordAuthenticationToken(principal, token, userAuthorities);
     }
 }

@@ -36,38 +36,51 @@ public class CacheUtils {
     }
 
     public String cache(Object data) {
-        String hashedKey = DigestUtils.md5DigestAsHex(UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8));
-        cache(hashedKey, data, cacheProps.getTtlMinutes());
-        return hashedKey;
+        return cache(UUID.randomUUID().toString(), data, cacheProps.getTtlMinutes());
     }
 
-    public void cache(String key, Object data) {
-        cache(key, data, cacheProps.getTtlMinutes());
+    public String cache(String key, Object data) {
+        return cache(key, data, cacheProps.getTtlMinutes());
     }
 
-    public void cache(String key, Object data, int ttlMinutes) {
+    public String cache(String key, Object data, int ttlMinutes) {
         try {
             String hashedKey = DigestUtils.md5DigestAsHex(key.getBytes(StandardCharsets.UTF_8));
             String jsonData = objectMapper.writeValueAsString(data);
             redisTemplate.opsForValue().set(hashedKey, jsonData, Duration.ofMinutes(ttlMinutes));
             log.debug("[{}] - Cached data with key: {}", ENTITY_NAME, hashedKey);
+            return hashedKey;
         } catch (Exception e) {
             log.warn("[{}] - Failed to cache data: {}", ENTITY_NAME, e.getMessage());
         }
+
+        return null;
     }
 
-    public String getCache(String key) {
-        return redisTemplate.opsForValue().get(key);
+    public String get(String key) {
+        String hashedKey = DigestUtils.md5DigestAsHex(key.getBytes(StandardCharsets.UTF_8));
+        return redisTemplate.opsForValue().get(hashedKey);
     }
 
-    public <T> T getCache(String key, Class<T> type) {
-        String cachedData = getCache(key);
+    public <T> T get(String key, Class<T> type) {
+        String cachedData = get(key);
 
         try {
             return objectMapper.readValue(cachedData, type);
         } catch (JsonProcessingException e) {
             log.warn("[{}] - Failed to parse cache data: {}", ENTITY_NAME, e.getMessage());
+            evict(key);
             return null;
+        }
+    }
+
+    public void evict(String key) {
+        try {
+            String hashedKey = DigestUtils.md5DigestAsHex(key.getBytes(StandardCharsets.UTF_8));
+            redisTemplate.delete(hashedKey);
+            log.debug("[{}] - Evicted cache for key: {}", ENTITY_NAME, hashedKey);
+        } catch (Exception e) {
+            log.warn("[{}] - Failed to evict cache for key {}: {}", ENTITY_NAME, key, e.getMessage());
         }
     }
 }

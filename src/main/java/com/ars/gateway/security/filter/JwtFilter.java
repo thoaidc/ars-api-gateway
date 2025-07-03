@@ -1,8 +1,6 @@
 package com.ars.gateway.security.filter;
 
-import com.ars.gateway.common.CacheUtils;
 import com.ars.gateway.common.SecurityUtils;
-import com.ars.gateway.config.properties.CacheProps;
 import com.dct.model.common.JsonUtils;
 import com.dct.model.constants.BaseHttpStatusConstants;
 import com.dct.model.dto.response.BaseResponseDTO;
@@ -15,7 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.lang.NonNull;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -23,10 +20,8 @@ import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Objects;
 
 @Component
 public class JwtFilter implements WebFilter {
@@ -34,54 +29,25 @@ public class JwtFilter implements WebFilter {
     private static final Logger log = LoggerFactory.getLogger(JwtFilter.class);
     private static final String ENTITY_NAME = "JwtFilter";
     private final JwtProvider jwtProvider;
-    private final CacheProps cacheConfig;
-    private final CacheUtils cacheUtils;
 
-    public JwtFilter(JwtProvider jwtProvider, CacheProps cacheConfig, CacheUtils cacheUtils) {
+    public JwtFilter(JwtProvider jwtProvider) {
         this.jwtProvider = jwtProvider;
-        this.cacheConfig = cacheConfig;
-        this.cacheUtils = cacheUtils;
     }
 
     @Override
     @NonNull
     public Mono<Void> filter(@NonNull ServerWebExchange exchange, @NonNull WebFilterChain chain) {
-        // Extract JWT token
         String token = StringUtils.trimToNull(SecurityUtils.retrieveTokenFromHeader(exchange.getRequest()));
 
-        if (Objects.isNull(token)) {
-            log.warn("[{}] - Missing token for protected endpoint", ENTITY_NAME);
-            return handleUnauthorized(exchange, "Authentication token required");
-        }
-
-        return validateToken(token)
+        return jwtProvider.validateToken(token)
                 .flatMap(authentication ->
                     chain.filter(exchange).contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication))
                 )
-                .onErrorResume(e -> {
-                    log.error("[{}] - Token validation failed: {}", ENTITY_NAME, e.getMessage());
-                    return handleUnauthorized(exchange, "Invalid or expired token");
-                });
+                .onErrorResume(e -> handleUnauthorized(exchange, e));
     }
 
-    private Mono<Authentication> validateToken(String token) {
-        if (cacheConfig.isEnabled()) {
-            return Mono.fromCallable(() -> cacheUtils.getCache(token, Authentication.class))
-                    .subscribeOn(Schedulers.boundedElastic())
-                    .switchIfEmpty(validateAndCacheToken(token));
-        }
-
-        return Mono.fromCallable(() -> jwtProvider.validateToken(token)).subscribeOn(Schedulers.boundedElastic());
-    }
-
-    private Mono<Authentication> validateAndCacheToken(String token) {
-        return Mono.fromCallable(() -> jwtProvider.validateToken(token))
-                .subscribeOn(Schedulers.boundedElastic())
-                .doOnNext(authentication -> cacheUtils.cache(token, authentication));
-    }
-
-    private Mono<Void> handleUnauthorized(ServerWebExchange exchange, String message) {
-        log.error("[{}] - Authentication failed: {}", ENTITY_NAME, message);
+    private Mono<Void> handleUnauthorized(ServerWebExchange exchange, Throwable e) {
+        log.error("[{}] - Token validation failed: {}", ENTITY_NAME, e.getMessage());
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
         response.getHeaders().add("Content-Type", MediaType.APPLICATION_JSON_VALUE);
@@ -89,7 +55,7 @@ public class JwtFilter implements WebFilter {
         BaseResponseDTO responseDTO = BaseResponseDTO.builder()
                 .code(BaseHttpStatusConstants.UNAUTHORIZED)
                 .success(BaseHttpStatusConstants.STATUS.FAILED)
-                .message(message)
+                .message("Unauthorized request! Your token was invalid or expired.")
                 .build();
 
         String responseBody = JsonUtils.toJsonString(responseDTO);
