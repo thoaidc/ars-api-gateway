@@ -1,14 +1,12 @@
 package com.ars.gateway.common;
 
 import com.ars.gateway.config.properties.CacheProps;
-import com.ars.gateway.constants.PropertiesConstants;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
@@ -19,7 +17,6 @@ import java.time.Duration;
 import java.util.UUID;
 
 @Component
-@ConditionalOnProperty(name = PropertiesConstants.ENABLED_CACHE, havingValue = "true")
 @EnableConfigurationProperties(CacheProps.class)
 public class CacheUtils {
 

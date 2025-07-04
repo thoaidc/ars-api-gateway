@@ -80,11 +80,7 @@ public class JwtProvider {
     private Mono<Authentication> validateAndCache(String token) {
         return Mono.fromCallable(() -> parseToken(token))
                 .subscribeOn(Schedulers.boundedElastic())
-                .doOnNext(authentication -> {
-                    if (cacheConfig.isEnabled()) {
-                        cacheUtils.cache(token, authentication);
-                    }
-                });
+                .doOnNext(authentication -> cacheUtils.cache(token, authentication));
     }
 
     private Authentication parseToken(String token) {
