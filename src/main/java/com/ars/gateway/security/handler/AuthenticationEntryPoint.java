@@ -7,6 +7,7 @@ import com.dct.model.dto.response.BaseResponseDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -30,7 +31,7 @@ public class AuthenticationEntryPoint implements ServerAuthenticationEntryPoint 
         log.error("[{}] - Authentication entry point is active: {}", ENTITY_NAME, ex.getMessage());
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
-        response.getHeaders().add("Content-Type", MediaType.APPLICATION_JSON_VALUE);
+        response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
 
         BaseResponseDTO responseDTO = BaseResponseDTO.builder()
                 .code(BaseHttpStatusConstants.UNAUTHORIZED)
