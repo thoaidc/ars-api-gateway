@@ -33,8 +33,14 @@ spring:
     gateway:
       # Global request filters
       default-filters:
-        - AddRequestHeader=X-API-Version, v1
-        - AddResponseHeader=Cache-Control, public, max-age=300
+        - name: AddRequestHeader
+          args:
+            name: X-API-Version
+            value: v1
+        - name: AddResponseHeader
+          args:
+            name: Cache-Control
+            value: public, max-age=300
         - name: RequestRateLimiter # The name of the filter built into Spring Gateway, cannot be changed
           args:
             redis-rate-limiter.replenishRate: 5
@@ -132,14 +138,9 @@ management:
           - gateway
           - circuitbreakers
           - redis
+          - refresh
   endpoint:
-    gateway:
-      enabled: true
-    metrics:
-      enabled: true
-    prometheus:
-      enabled: true
     health:
       show-details: always
   server:
-    port: 8888
+    port: 8000
