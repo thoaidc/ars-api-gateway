@@ -2,77 +2,18 @@
 <!DOCTYPE configuration>
 
 <configuration scan="true">
-    <!-- Patterns based on https://github.com/spring-projects/spring-boot/blob/v2.7.2/spring-boot-project/spring-boot/src/main/resources/org/springframework/boot/logging/logback/defaults.xml -->
-    <!-- Defines the keyword "crlf" that can be used in log patterns.-->
-    <!-- Bind the "crlf" keyword to the CRLFLogConverter class, which handles the removal of unsafe characters like \n, \r, and \t -->
-    <conversionRule conversionWord="crlf" converterClass="com.ars.gateway.config.CRLFLogConverter" />
+    <!-- Include custom config from dct-starter-model FIRST -->
+    <include resource="logback/base.xml"/>
 
-    <!-- Define log pattern for log console -->
-    <property name="CONSOLE_LOG_PATTERN" value="${CONSOLE_LOG_PATTERN:-%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}){} %clr(${PID:-}){magenta} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %crlf%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"/>
-
-    <!-- Define log pattern for log file -->
-    <property name="FILE_LOG_PATTERN" value="${FILE_LOG_PATTERN:-%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:-} --- %-40.40logger{39} : %crlf%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}"/>
-
+    <!-- Then include Spring Boot base -->
     <!-- Includes default configurations from Spring Boot, which usually define basic appender and formats -->
     <include resource="org/springframework/boot/logging/logback/base.xml"/>
 
-    <!-- Synchronize log levels from Logback to java.util.logging (JUL) -->
-    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
-        <resetJUL>true</resetJUL>
-    </contextListener>
-
-    <springProperty name="LOG_PATH" source="logging.file-path"/>
-
-    <!-- Logging to file with rolling mechanism, creating new log every day -->
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <maxFileSize>10MB</maxFileSize>
-            <maxHistory>10</maxHistory> <!-- Stores maximum logs of the last 10 days -->
-        </rollingPolicy>
-        <encoder>
-            <charset>utf-8</charset>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36}: %msg %n</pattern>
-        </encoder>
-    </appender>
-
     <root>
+        <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
     </root>
 
-    <!-- Appender for unsafe log. Dedicated to connection pool leak monitoring log -->
-    <appender name = "CONNECTION_POOL_FILE" class = "ch.qos.logback.core.FileAppender">
-        <file>${LOG_PATH}/connection_pool_leak.log</file>
-        <encoder>
-            <charset>utf-8</charset>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg %n</pattern>
-        </encoder>
-    </appender>
-
-    <!-- Set log levels for specific loggers, for example WARN for Hibernate to reduce unnecessary logging -->
-    <logger name="com.zaxxer.hikari.pool.PoolBase" level="INFO" additivity="false">
-        <appender-ref ref="CONNECTION_POOL_FILE"/>
-    </logger>
-    <logger name="ch.qos.logback" level="ERROR"/>
-    <logger name="javax.activation" level="WARN"/>
-    <logger name="javax.mail" level="WARN"/>
-    <logger name="javax.management.remote" level="WARN"/>
-    <logger name="com.sun" level="WARN"/>
-    <logger name="org.apache" level="WARN"/>
-    <logger name="org.apache.catalina.startup.DigesterFactory" level="WARN"/>
-    <logger name="org.hibernate" level="WARN"/>
-    <logger name="org.hibernate.validator" level="WARN"/>
-    <logger name="org.hibernate.ejb.HibernatePersistence" level="WARN"/>
-    <logger name="org.springframework" level="WARN"/>
-    <logger name="org.springframework.web" level="WARN"/>
-    <logger name="org.springframework.security" level="WARN"/>
-    <logger name="org.springframework.cache" level="WARN"/>
-    <logger name="org.thymeleaf" level="WARN"/>
-    <logger name="jdk.event.security" level="WARN"/>
-    <logger name="sun.rmi" level="WARN"/>
-    <logger name="sun.rmi.transport" level="WARN"/>
-    <logger name="com.zaxxer.hikari" level="WARN"/>
-    <logger name="sun.net.www." level="WARN"/>
-    <logger name="sun.awt.windows.WToolkit" level="WARN"/>
-    <logger name="_org.springframework.web.servlet.HandlerMapping.Mappings" level="WARN"/>
+    <!-- Override/add your own logger below if needed -->
+    <!-- Ex: <logger name="com.dct.custom" level="DEBUG"/> -->
 </configuration>

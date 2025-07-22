@@ -11,13 +11,15 @@
 # https://docs.spring.io/spring-boot/reference/features/profiles.html
 # ===================================================================
 
+spring.config.import: optional:configserver:http://localhost:8888
+
 server:
   port: 8080
   shutdown: graceful
 
 spring:
   application:
-    name: ars-api-gateway
+    name: api-gateway
   profiles:
     active: "@profiles.active@"
   lifecycle:
@@ -30,6 +32,8 @@ spring:
       max-parts: 64
 
   cloud:
+    config:
+      uri: http://localhost:8888
     gateway:
       # Global request filters
       default-filters:
