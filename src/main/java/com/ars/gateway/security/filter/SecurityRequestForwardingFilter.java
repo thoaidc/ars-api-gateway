@@ -1,8 +1,10 @@
 package com.ars.gateway.security.filter;
 
 import com.ars.gateway.constants.CommonConstants;
-import com.dct.model.common.JsonUtils;
-import com.dct.model.dto.auth.UserDTO;
+import com.dct.model.common.SecurityUtils;
+import com.dct.model.config.properties.SecurityProps;
+import com.dct.model.constants.BaseSecurityConstants;
+import com.dct.model.dto.auth.BaseUserDTO;
 import com.dct.model.exception.BaseAuthenticationException;
 
 import org.slf4j.Logger;
@@ -12,15 +14,16 @@ import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
-import org.springframework.security.web.server.authorization.AuthorizationWebFilter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.web.server.authorization.AuthorizationWebFilter;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -51,18 +54,29 @@ import java.util.stream.Collectors;
 public class SecurityRequestForwardingFilter implements GlobalFilter, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityRequestForwardingFilter.class);
-    private static final String ENTITY_NAME = "SecurityRequestForwardingFilter";
+    private static final String ENTITY_NAME = "com.ars.gateway.security.filter.SecurityRequestForwardingFilter";
+    private final String[] publicPatterns;
+
+    public SecurityRequestForwardingFilter(SecurityProps securityProps) {
+        this.publicPatterns = Optional.ofNullable(securityProps).orElseGet(SecurityProps::new).getPublicRequestPatterns();
+    }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        log.debug("[{}] - Forward security request: {}", ENTITY_NAME, exchange.getRequest().getPath());
+        String requestUri = exchange.getRequest().getURI().getPath();
+
+        if (SecurityUtils.checkIfAuthenticationNotRequired(requestUri, publicPatterns)) {
+            return chain.filter(exchange);
+        }
+
+        log.debug("[HEADER_SECURITY_FORWARD] - Forward request: {}: {}", exchange.getRequest().getMethod(), requestUri);
         Authentication authentication = exchange.getAttribute(CommonConstants.AUTHENTICATION_EXCHANGE_ATTRIBUTE);
 
         if (Objects.isNull(authentication)) {
             return Mono.error(new BaseAuthenticationException(ENTITY_NAME, "Authentication not found!"));
         }
 
-        UserDTO userDTO = (UserDTO) authentication.getPrincipal();
+        BaseUserDTO userDTO = (BaseUserDTO) authentication.getPrincipal();
         Set<String> userPermissions = userDTO.getAuthorities()
                 .stream()
                 .map(GrantedAuthority::getAuthority)
@@ -70,9 +84,9 @@ public class SecurityRequestForwardingFilter implements GlobalFilter, Ordered {
                 .collect(Collectors.toSet());
 
         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
-                .header("X-User-Id", String.valueOf(userDTO.getId()))
-                .header("X-User-Name", userDTO.getUsername())
-                .header("X-User-Permissions", JsonUtils.toJsonString(userPermissions))
+                .header(BaseSecurityConstants.HEADER.USER_ID, String.valueOf(userDTO.getId()))
+                .header(BaseSecurityConstants.HEADER.USER_NAME, userDTO.getUsername())
+                .header(BaseSecurityConstants.HEADER.USER_AUTHORITIES, String.join(",", userPermissions))
                 .build();
 
         return chain.filter(exchange.mutate().request(mutatedRequest).build());

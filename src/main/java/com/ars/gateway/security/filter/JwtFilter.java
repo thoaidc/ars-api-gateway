@@ -1,13 +1,13 @@
 package com.ars.gateway.security.filter;
 
-import com.ars.gateway.common.SecurityUtils;
-import com.ars.gateway.config.properties.PublicEndpointProps;
 import com.ars.gateway.constants.CommonConstants;
 import com.dct.model.common.JsonUtils;
+import com.dct.model.common.SecurityUtils;
+import com.dct.model.config.properties.SecurityProps;
 import com.dct.model.constants.BaseHttpStatusConstants;
 import com.dct.model.dto.response.BaseResponseDTO;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -23,7 +23,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
-
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
 import reactor.core.publisher.Mono;
@@ -36,27 +35,26 @@ import java.util.List;
 public class JwtFilter implements WebFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtFilter.class);
-    private static final String ENTITY_NAME = "JwtFilter";
     private final JwtProvider jwtProvider;
     private final List<PathPattern> publicPatterns;
 
-    public JwtFilter(JwtProvider jwtProvider, PublicEndpointProps publicEndpointProps) {
+    public JwtFilter(JwtProvider jwtProvider, SecurityProps securityProps) {
         this.jwtProvider = jwtProvider;
         PathPatternParser parser = new PathPatternParser();
-        this.publicPatterns = Arrays.stream(publicEndpointProps.getPublicPatterns()).map(parser::parse).toList();
+        this.publicPatterns = Arrays.stream(securityProps.getPublicRequestPatterns()).map(parser::parse).toList();
     }
 
     @Override
     @NonNull
     public Mono<Void> filter(@NonNull ServerWebExchange exchange, @NonNull WebFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
-        log.debug("[{}] - JWT filtering request: {}", ENTITY_NAME, path);
+        log.debug("[GATEWAY_JWT_FILTER] - Filtering request: {}", path);
 
         if (ifAuthenticationNotRequired(path)) {
             return chain.filter(exchange);
         }
 
-        String token = StringUtils.trimToNull(SecurityUtils.retrieveTokenFromHeader(exchange.getRequest()));
+        String token = StringUtils.trimToNull(SecurityUtils.retrieveTokenWebFlux(exchange.getRequest()));
 
         return jwtProvider.validateToken(token)
                 .flatMap(authentication -> setAuthentication(exchange, chain, authentication))
@@ -73,14 +71,14 @@ public class JwtFilter implements WebFilter {
     }
 
     private Mono<Void> handleUnauthorized(ServerWebExchange exchange, Throwable e) {
-        log.error("[{}] - Token validation failed: {}", ENTITY_NAME, e.getMessage());
+        log.error("[GATEWAY_JWT_FILTER_ERROR] - Token validation failed: {}", e.getMessage());
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
         response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
 
         BaseResponseDTO responseDTO = BaseResponseDTO.builder()
                 .code(BaseHttpStatusConstants.UNAUTHORIZED)
-                .success(BaseHttpStatusConstants.STATUS.FAILED)
+                .success(Boolean.FALSE)
                 .message("Unauthorized request! Your token was invalid or expired.")
                 .build();
 

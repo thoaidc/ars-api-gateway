@@ -1,9 +1,8 @@
-package com.ars.gateway.security;
+package com.ars.gateway.security.config;
 
-import com.ars.gateway.config.properties.CorsProps;
-import com.ars.gateway.config.properties.PublicEndpointProps;
 import com.ars.gateway.security.filter.JwtFilter;
-import com.dct.model.config.properties.JwtProps;
+import com.dct.model.config.properties.CorsProps;
+import com.dct.model.config.properties.SecurityProps;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -24,23 +23,23 @@ import java.util.Objects;
 
 @Configuration
 @EnableWebFluxSecurity
-@EnableConfigurationProperties({PublicEndpointProps.class, JwtProps.class, CorsProps.class})
+@EnableConfigurationProperties({SecurityProps.class, CorsProps.class})
 public class GatewaySecurityConfig {
 
     private final ServerAuthenticationEntryPoint authenticationEntryPoint;
     private final ServerAccessDeniedHandler accessDeniedHandler;
-    private final PublicEndpointProps publicEndpointProps;
+    private final SecurityProps securityProps;
     private final JwtFilter jwtFilter;
     private final CorsProps corsProps;
 
     public GatewaySecurityConfig(ServerAuthenticationEntryPoint authenticationEntryPoint,
                                  ServerAccessDeniedHandler accessDeniedHandler,
-                                 PublicEndpointProps publicEndpointProps,
+                                 SecurityProps securityProps,
                                  JwtFilter jwtFilter,
                                  CorsProps corsProps) {
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
-        this.publicEndpointProps = publicEndpointProps;
+        this.securityProps = securityProps;
         this.jwtFilter = jwtFilter;
         this.corsProps = corsProps;
     }
@@ -59,7 +58,7 @@ public class GatewaySecurityConfig {
                 )
                 .addFilterBefore(jwtFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .authorizeExchange(exchanges ->
-                    exchanges.pathMatchers(publicEndpointProps.getPublicPatterns()).permitAll()
+                    exchanges.pathMatchers(securityProps.getPublicRequestPatterns()).permitAll()
                     .anyExchange().authenticated()
                 )
                 .exceptionHandling(exceptions -> exceptions
@@ -73,7 +72,7 @@ public class GatewaySecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 
-        corsProps.getCorsConfigurations().forEach((path, config) -> {
+        corsProps.getPatterns().forEach((path, config) -> {
             CorsConfiguration cors = new CorsConfiguration();
             cors.setAllowedOrigins(config.getAllowedOrigins());
             cors.setAllowedMethods(config.getAllowedMethods());

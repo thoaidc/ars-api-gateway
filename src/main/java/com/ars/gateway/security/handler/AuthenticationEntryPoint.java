@@ -22,20 +22,18 @@ import java.nio.charset.StandardCharsets;
 
 @Component
 public class AuthenticationEntryPoint implements ServerAuthenticationEntryPoint {
-
     private static final Logger log = LoggerFactory.getLogger(AuthenticationEntryPoint.class);
-    private static final String ENTITY_NAME = "AuthenticationEntryPoint";
 
     @Override
     public Mono<Void> commence(ServerWebExchange exchange, AuthenticationException ex) {
-        log.error("[{}] - Authentication entry point is active: {}", ENTITY_NAME, ex.getMessage());
+        log.error("[AUTHENTICATION_ENTRYPOINT] - error: {}", ex.getMessage());
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
         response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
 
         BaseResponseDTO responseDTO = BaseResponseDTO.builder()
                 .code(BaseHttpStatusConstants.UNAUTHORIZED)
-                .success(BaseHttpStatusConstants.STATUS.FAILED)
+                .success(Boolean.FALSE)
                 .message(ex.getMessage())
                 .build();
 

@@ -10,6 +10,7 @@
 # Full reference is available at:
 # https://docs.spring.io/spring-boot/reference/features/profiles.html
 # ===================================================================
+spring.config.import: optional:configserver:http://localhost:8888
 
 logging:
   level:
@@ -18,10 +19,87 @@ logging:
   charset:
     console: UTF-8
     file: UTF-8
-  # Custom properties to define logs file paths according to different profiles
-  file-path: /mnt/logs
+  file:
+    path: /opt/logs/gateway
 
 spring:
+  cloud:
+    config:
+      uri: http://localhost:8888
+    gateway:
+      # Global request filters
+      default-filters:
+        - name: AddRequestHeader
+          args:
+            name: X-API-Version
+            value: v1
+        - name: AddResponseHeader
+          args:
+            name: Cache-Control
+            value: public, max-age=300
+        - name: RequestRateLimiter # The name of the filter built into Spring Gateway, cannot be changed
+          args:
+            redis-rate-limiter.replenishRate: 50
+            redis-rate-limiter.burstCapacity: 100
+            redis-rate-limiter.requestedTokens: 1
+            key-resolver: "#{@compositeKeyResolver}"
+            deny-empty-key: false
+            empty-key-status: TOO_MANY_REQUESTS
+        - name: CircuitBreaker # The name of the filter built into Spring Gateway, cannot be changed
+          args:
+            name: service-cb
+            fallbackUri: forward:/fallback/services/unavailable
+            statusCodes:
+              - 500
+              - 502
+              - 503
+            slowCallDurationThreshold: 5000ms
+            slowCallRateThreshold: 75
+        - name: Retry # The name of the filter built into Spring Gateway, cannot be changed
+          args:
+            retries: 5
+            statuses:
+              - BAD_GATEWAY
+              - SERVICE_UNAVAILABLE
+            methods:
+              - GET
+            backoff:
+              firstBackoff: 100ms
+              maxBackoff: 1000ms
+              factor: 2
+              basedOnPreviousValue: false
+
+      # Route configurations
+      routes:
+        - id: chat-service-websocket-route
+          uri: lb:ws://chat-service
+          predicates:
+            - Path=/ws/**
+
+        - id: user-service-route
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/api/v1/users/**,/api/p/v1/users/**
+            - Method=GET,POST,PUT,PATCH,DELETE
+          filters:
+            - name: RequestSize # The name of the filter built into Spring Gateway, cannot be changed
+              args:
+                maxSize: 5MB
+
+      # Load balancer configuration
+      loadbalancer:
+        use404: true
+
+      # Metrics configuration
+      metrics:
+        enabled: true
+        tags:
+          path:
+            enabled: true
+          application: ${spring.application.name}
+          environment: ${spring.profiles.active}
+      observability:
+        enabled: true
   # Redis Configuration for Rate Limiting
   data:
     redis:
@@ -42,35 +120,29 @@ spring:
         shutdown-timeout: 1000ms
       ssl:
         enabled: false
+  webflux:
+    multipart:
+      max-in-memory-size: 2MB
+      max-disk-usage-per-part: 15MB
+      max-parts: 64
 
-  cloud:
-    gateway:
-      # Global CORS configuration
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins:
-              - "http://localhost:4200"
-              - "http://localhost:8080"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - PATCH
-              - DELETE
-              - OPTIONS
-            allowedHeaders:
-              - Content-Type
-              - Authorization
-              - Accept
-              - Origin
-              - X-CSRF-Token
-              - X-Requested-With
-              - Access-Control-Allow-Origin
-              - X-App-Version
-              - X-Device-ID
-            allowCredentials: true
-            maxAge: 3600  # Cache preflight response in 1 hour
+resilience4j:
+  circuitbreaker:
+    instances:
+      service-cb:
+        slidingWindowType: COUNT_BASED
+        slowCallDurationThreshold: 5s # If request call > 5s → considered slow
+        slowCallRateThreshold: 75     # If ≥75% of calls are delayed → open circuit
+        registerHealthIndicator: true # Allows exposing circuit breaker status via actuator /actuator/health
+        slidingWindowSize: 10     # Use a sliding window of size 10 most recent calls to calculate the error
+        minimumNumberOfCalls: 5   # Only start evaluating errors after at least 5 requests
+        # When circuit breaker opens → after timeout → switches to half-open state, allowing 3 retry requests for testing
+        permittedNumberOfCallsInHalfOpenState: 3
+        # After waitDurationInOpenState, automatically switch from open to half-open (no new request required)
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s   # When circuit is open, wait 5s before allowing retry
+        failureRateThreshold: 50      # If error rate > 50% in slidingWindowSize → open circuit (disconnect)
+        eventConsumerBufferSize: 10   # Circuit breaker status event log buffer (for monitoring, logging)
 
 # Eureka client configuration
 eureka:
@@ -86,36 +158,58 @@ eureka:
     hostname: localhost
     instanceId: ${spring.application.name}:${server.port}
 
-ars:
-  gateway:
-    rate-limiter:
-      ip-validation-enabled: true
-      excluded-ips:
-        - "127.0.0.1"
-        - "::1"
-        - "host.docker.internal"
-      excluded-ip-prefixes: []
-    security:
-      request:
-        public-patterns:
-          - /*/api/p/**
-          - /*/api/v1/p/**
-    cache:
-      enabled: true
-      ttl-minutes: 5
-
-dct:
-  base:
-    security:
-      jwt:
-        enabled: true
-        base64-secret-key: ${ARS_GATEWAY_SECURITY_KEY}
-        access-token:
-          validity: 300000 # 5 minutes
-        refresh-token:
-          validity: 3600000 # 1 hour
-          validity-for-remember: 604800000 # 7 days
-    i18n:
-      base-names:
-        - classpath:i18n/messages
-      encoding: UTF-8
+app:
+  rate-limiter:
+    ip-validation-enabled: true
+    excluded-ips:
+      - "127.0.0.1"
+      - "::1"
+      - "0:0:0:0:0:0:0:1"
+      - "host.docker.internal"
+    excluded-ip-prefixes:
+      - "192.168."
+      - "10."
+      - "172.16."
+  security:
+    public-request-patterns:
+      - /api/v1/p/**
+      - /ws/**
+    jwt:
+      base64-secret-key: ${ARS_GATEWAY_SECURITY_KEY}
+      access-token:
+        validity: 300000 # 5 minutes
+      refresh-token:
+        validity: 3600000 # 1 hour
+        validity-for-remember: 604800000 # 7 days
+  i18n:
+    base-names:
+      - classpath:i18n/messages
+      - classpath:i18n/base_messages
+    encoding: UTF-8
+  cors:
+    activate: enabled
+    patterns:
+      '[/**]':
+        allowedOrigins:
+          - "http://localhost:8080"
+          - "http://localhost:8081"
+          - "http://localhost:8082"
+        allowedMethods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+        allowedHeaders:
+          - Content-Type
+          - Authorization
+          - Accept
+          - Origin
+          - X-CSRF-Token
+          - X-Requested-With
+          - Access-Control-Allow-Origin
+          - X-App-Version
+          - X-Device-ID
+        allowCredentials: true
+        maxAge: 3600  # Cache preflight response in 1 hour

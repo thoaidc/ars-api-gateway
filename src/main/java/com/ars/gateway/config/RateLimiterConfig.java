@@ -1,6 +1,8 @@
 package com.ars.gateway.config;
 
-import com.ars.gateway.config.properties.RateLimiterProps;
+import com.dct.model.config.properties.RateLimiterProps;
+import com.dct.model.constants.BaseSecurityConstants;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -22,8 +24,7 @@ import java.util.Objects;
 public class RateLimiterConfig {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimiterConfig.class);
-    private static final String ENTITY_NAME = "RateLimiterConfig";
-    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String BEARER_PREFIX = BaseSecurityConstants.HEADER.TOKEN_TYPE;
     private static final String X_FORWARDED_FOR = "X-Forwarded-For";
     private static final String X_REAL_IP = "X-Real-IP";
     private static final String USER_AGENT = "User-Agent";
@@ -43,7 +44,7 @@ public class RateLimiterConfig {
         String authKey = resolveByAuthToken(exchange);
 
         if (authKey != null) {
-            log.debug("[{}] - Resolved rate limit using token with key: {}", ENTITY_NAME, authKey);
+            log.debug("[RATE_LIMIT_BY_TOKEN] - Using token with key: {}", authKey);
             return authKey;
         }
 
@@ -51,12 +52,12 @@ public class RateLimiterConfig {
         String uaKey = resolveByUserAgentAndClientIP(exchange);
 
         if (uaKey != null) {
-            log.debug("[{}] - Resolved rate limit using User-Agent + IP with key: {}", ENTITY_NAME, uaKey);
+            log.debug("[RATE_LIMIT_BY_IP] - Using User-Agent + IP with key: {}", uaKey);
             return uaKey;
         }
 
         // 3. Final fallback, aggregates all ambiguous requests to strictly limit
-        log.debug("[{}] - Resolved rate limit for anonymous user", ENTITY_NAME);
+        log.debug("[RATE_LIMIT_ANONYMOUS_USER] - Resolved rate limit for anonymous user");
         return "anonymous";
     }
 

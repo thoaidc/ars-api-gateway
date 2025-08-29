@@ -1,62 +1,63 @@
 package com.ars.gateway.common;
 
-import com.ars.gateway.config.properties.CacheProps;
-
+import com.dct.model.config.properties.RedisProps;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.DigestUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.UUID;
 
 @Component
-@EnableConfigurationProperties(CacheProps.class)
 public class CacheUtils {
-
     private static final Logger log = LoggerFactory.getLogger(CacheUtils.class);
-    private static final String ENTITY_NAME = "CacheUtils";
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
-    private final CacheProps cacheProps;
+    private final RedisProps redisProps;
 
-    public CacheUtils(RedisTemplate<String, String> redisTemplate, ObjectMapper objectMapper, CacheProps cacheProps) {
+    public CacheUtils(RedisTemplate<String, String> redisTemplate, ObjectMapper objectMapper, RedisProps redisProps) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
-        this.cacheProps = cacheProps;
+        this.redisProps = redisProps;
     }
 
-    public String cache(Object data) {
-        return cache(UUID.randomUUID().toString(), data, cacheProps.getTtlMinutes());
+    public String hashKey(String key) {
+        return DigestUtils.md5DigestAsHex(key.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String cache(String key, Object data) {
-        return cache(key, data, cacheProps.getTtlMinutes());
+    public void cache(String key, Object data) {
+        cache(key, data, redisProps.getTtlMinutes());
     }
 
-    public String cache(String key, Object data, int ttlMinutes) {
+    public void cache(String key, Object data, int ttlMinutes) {
         try {
-            String hashedKey = DigestUtils.md5DigestAsHex(key.getBytes(StandardCharsets.UTF_8));
+            String hashKey = hashKey(key);
             String jsonData = objectMapper.writeValueAsString(data);
-            redisTemplate.opsForValue().set(hashedKey, jsonData, Duration.ofMinutes(ttlMinutes));
-            log.debug("[{}] - Cached data with key: {}", ENTITY_NAME, hashedKey);
-            return hashedKey;
+            redisTemplate.opsForValue().set(hashKey, jsonData, Duration.ofMinutes(ttlMinutes));
+            log.debug("[CACHED_DATA] - Cached data with key: {}", hashKey);
         } catch (Exception e) {
-            log.warn("[{}] - Failed to cache data: {}", ENTITY_NAME, e.getMessage());
+            log.warn("[CACHED_DATA_ERROR] - Failed to cache data: {}", e.getMessage());
         }
-
-        return null;
     }
 
     public String get(String key) {
-        String hashedKey = DigestUtils.md5DigestAsHex(key.getBytes(StandardCharsets.UTF_8));
-        return redisTemplate.opsForValue().get(hashedKey);
+        String hashedKey = hashKey(key);
+
+        try {
+            return redisTemplate.opsForValue().get(hashedKey);
+        } catch (RedisConnectionFailureException e) {
+            log.error("[REDIS_CONNECTION_ERROR] - Cannot connect to Redis: {}", e.getMessage());
+            return null;
+        } catch (Exception e) {
+            log.error("[REDIS_GET_ERROR] - Failed to get key {}: {}", hashedKey, e.getMessage());
+            return null;
+        }
     }
 
     public <T> T get(String key, Class<T> type) {
@@ -65,7 +66,7 @@ public class CacheUtils {
         try {
             return objectMapper.readValue(cachedData, type);
         } catch (JsonProcessingException e) {
-            log.warn("[{}] - Failed to parse cache data: {}", ENTITY_NAME, e.getMessage());
+            log.warn("[PARSE_CACHED_DATA_ERROR] - Failed to parse cached data: {}", e.getMessage());
             evict(key);
             return null;
         }
@@ -73,11 +74,11 @@ public class CacheUtils {
 
     public void evict(String key) {
         try {
-            String hashedKey = DigestUtils.md5DigestAsHex(key.getBytes(StandardCharsets.UTF_8));
+            String hashedKey = hashKey(key);
             redisTemplate.delete(hashedKey);
-            log.debug("[{}] - Evicted cache for key: {}", ENTITY_NAME, hashedKey);
+            log.debug("[EVICTED_CACHE] - Evicted cache for key: {}", hashedKey);
         } catch (Exception e) {
-            log.warn("[{}] - Failed to evict cache for key {}: {}", ENTITY_NAME, key, e.getMessage());
+            log.warn("[EVICTED_CACHE_ERROR] - Failed to evict cache for key {}: {}", key, e.getMessage());
         }
     }
 }

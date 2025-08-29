@@ -21,20 +21,18 @@ import java.nio.charset.StandardCharsets;
 
 @Component
 public class AccessDeniedHandler implements ServerAccessDeniedHandler {
-
     private static final Logger log = LoggerFactory.getLogger(AccessDeniedHandler.class);
-    private static final String ENTITY_NAME = "AccessDeniedHandler";
 
     @Override
     public Mono<Void> handle(ServerWebExchange exchange, AccessDeniedException denied) {
-        log.error("[{}] - Access denied handler is active: {}", ENTITY_NAME, denied.getMessage());
+        log.error("[ACCESS_DENIED_HANDLER] - error: {}", denied.getMessage());
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.FORBIDDEN);
         response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
 
         BaseResponseDTO responseDTO = BaseResponseDTO.builder()
                 .code(BaseHttpStatusConstants.FORBIDDEN)
-                .success(BaseHttpStatusConstants.STATUS.FAILED)
+                .success(Boolean.FALSE)
                 .message(denied.getMessage())
                 .build();
 

@@ -5,10 +5,6 @@
     <!-- Include custom config from dct-starter-model FIRST -->
     <include resource="logback/base.xml"/>
 
-    <!-- Then include Spring Boot base -->
-    <!-- Includes default configurations from Spring Boot, which usually define basic appender and formats -->
-    <include resource="org/springframework/boot/logging/logback/base.xml"/>
-
     <root>
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
