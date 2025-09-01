@@ -76,19 +76,15 @@ spring:
       # Route configurations
       routes:
         - id: chat-service-websocket-route
-          uri: lb:ws://chat-service
+          uri: lb:ws://CHAT-SERVICE
           predicates:
             - Path=/ws/**
 
         - id: user-service-route
           uri: lb://USER-SERVICE
           predicates:
-            - Path=/api/v1/users/**,/api/p/v1/users/**
+            - Path=/api/v1/users/**, /api/p/v1/users/**
             - Method=GET,POST,PUT,PATCH,DELETE
-          filters:
-            - name: RequestSize # The name of the filter built into Spring Gateway, cannot be changed
-              args:
-                maxSize: 5MB
 
       # Load balancer configuration
       loadbalancer:
@@ -175,7 +171,7 @@ app:
       - "172.16."
   security:
     public-request-patterns:
-      - /api/v1/p/**
+      - /api/p/**
       - /ws/**
     jwt:
       base64-secret-key: ZGN0LWJhc2Utc2VjcmV0LWtleS10b2tlbi12YWxpZGl0eS04NjQwMDAwMG1zLWZvci1yZW1lbWJlci1tZS04NjQwMDAwMG1z
@@ -216,3 +212,6 @@ app:
           - X-Device-ID
         allowCredentials: true
         maxAge: 3600  # Cache preflight response in 1 hour
+
+  redis:
+    ttl-minutes: 5

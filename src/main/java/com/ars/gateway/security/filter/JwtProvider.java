@@ -8,12 +8,10 @@ import com.dct.model.constants.BaseExceptionConstants;
 import com.dct.model.constants.BaseSecurityConstants;
 import com.dct.model.dto.auth.BaseUserDTO;
 import com.dct.model.exception.BaseBadRequestException;
-import com.dct.model.security.BaseJwtProvider;
+import com.dct.model.security.AbstractJwtProvider;
 
 import io.jsonwebtoken.Claims;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -28,9 +26,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
-public class JwtProvider extends BaseJwtProvider {
-
-    private static final Logger log = LoggerFactory.getLogger(JwtProvider.class);
+public class JwtProvider extends AbstractJwtProvider {
     private static final String ENTITY_NAME = "com.ars.gateway.security.filter.JwtProvider";
     private final CacheUtils cacheUtils;
     private final RedisProps redisProps;
