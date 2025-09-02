@@ -52,7 +52,6 @@ import java.util.stream.Collectors;
  */
 @Component
 public class SecurityRequestForwardingFilter implements GlobalFilter, Ordered {
-
     private static final Logger log = LoggerFactory.getLogger(SecurityRequestForwardingFilter.class);
     private static final String ENTITY_NAME = "com.ars.gateway.security.filter.SecurityRequestForwardingFilter";
     private final String[] publicPatterns;

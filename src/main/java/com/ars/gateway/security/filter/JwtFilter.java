@@ -14,7 +14,6 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.server.PathContainer;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.lang.NonNull;
 import org.springframework.security.core.Authentication;
@@ -23,25 +22,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
-import org.springframework.web.util.pattern.PathPattern;
-import org.springframework.web.util.pattern.PathPatternParser;
-import reactor.core.publisher.Mono;
 
+import reactor.core.publisher.Mono;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.List;
 
 @Component
 public class JwtFilter implements WebFilter {
-
     private static final Logger log = LoggerFactory.getLogger(JwtFilter.class);
     private final JwtProvider jwtProvider;
-    private final List<PathPattern> publicPatterns;
+    private final String[] publicPatterns;
 
     public JwtFilter(JwtProvider jwtProvider, SecurityProps securityProps) {
         this.jwtProvider = jwtProvider;
-        PathPatternParser parser = new PathPatternParser();
-        this.publicPatterns = Arrays.stream(securityProps.getPublicRequestPatterns()).map(parser::parse).toList();
+        this.publicPatterns = securityProps.getPublicRequestPatterns();
     }
 
     @Override
@@ -50,7 +43,7 @@ public class JwtFilter implements WebFilter {
         String path = exchange.getRequest().getURI().getPath();
         log.debug("[GATEWAY_JWT_FILTER] - Filtering request: {}", path);
 
-        if (ifAuthenticationNotRequired(path)) {
+        if (SecurityUtils.checkIfAuthenticationNotRequired(path, publicPatterns)) {
             return chain.filter(exchange);
         }
 
@@ -59,10 +52,6 @@ public class JwtFilter implements WebFilter {
         return jwtProvider.validateToken(token)
                 .flatMap(authentication -> setAuthentication(exchange, chain, authentication))
                 .onErrorResume(error -> handleUnauthorized(exchange, error));
-    }
-
-    private boolean ifAuthenticationNotRequired(String path) {
-        return publicPatterns.stream().anyMatch(p -> p.matches(PathContainer.parsePath(path)));
     }
 
     private Mono<Void> setAuthentication(ServerWebExchange exchange, WebFilterChain chain, Authentication auth) {
