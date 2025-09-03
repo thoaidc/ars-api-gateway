@@ -83,7 +83,7 @@ spring:
         - id: user-service-route
           uri: lb://USER-SERVICE
           predicates:
-            - Path=/api/v1/users/**, /api/p/v1/users/**
+            - Path=/api/v1/users/**, /api/p/v1/users/**,/api/v1/roles/**
             - Method=GET,POST,PUT,PATCH,DELETE
 
       # Load balancer configuration

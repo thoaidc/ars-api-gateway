@@ -6,7 +6,9 @@ import com.dct.model.common.SecurityUtils;
 import com.dct.model.config.properties.SecurityProps;
 import com.dct.model.constants.BaseHttpStatusConstants;
 import com.dct.model.dto.response.BaseResponseDTO;
+import com.dct.model.exception.BaseException;
 
+import io.jsonwebtoken.JwtException;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +50,6 @@ public class JwtFilter implements WebFilter {
         }
 
         String token = StringUtils.trimToNull(SecurityUtils.retrieveTokenWebFlux(exchange.getRequest()));
-
         return jwtProvider.validateToken(token)
                 .flatMap(authentication -> setAuthentication(exchange, chain, authentication))
                 .onErrorResume(error -> handleUnauthorized(exchange, error));
@@ -60,19 +61,22 @@ public class JwtFilter implements WebFilter {
     }
 
     private Mono<Void> handleUnauthorized(ServerWebExchange exchange, Throwable e) {
-        log.error("[GATEWAY_JWT_FILTER_ERROR] - Token validation failed: {}", e.getMessage());
-        ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(HttpStatus.UNAUTHORIZED);
-        response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+        // Handle custom authenticate exception
+        if (e instanceof JwtException || e instanceof BaseException) {
+            log.error("[GATEWAY_JWT_FILTER_ERROR] - Token validation failed: {}", e.getMessage());
+            ServerHttpResponse response = exchange.getResponse();
+            response.setStatusCode(HttpStatus.UNAUTHORIZED);
+            response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+            BaseResponseDTO responseDTO = BaseResponseDTO.builder()
+                    .code(BaseHttpStatusConstants.UNAUTHORIZED)
+                    .success(Boolean.FALSE)
+                    .message("Unauthorized request! Your token was invalid or expired.")
+                    .build();
+            String responseBody = JsonUtils.toJsonString(responseDTO);
+            DataBuffer buffer = response.bufferFactory().wrap(responseBody.getBytes(StandardCharsets.UTF_8));
+            return response.writeWith(Mono.just(buffer));
+        }
 
-        BaseResponseDTO responseDTO = BaseResponseDTO.builder()
-                .code(BaseHttpStatusConstants.UNAUTHORIZED)
-                .success(Boolean.FALSE)
-                .message("Unauthorized request! Your token was invalid or expired.")
-                .build();
-
-        String responseBody = JsonUtils.toJsonString(responseDTO);
-        DataBuffer buffer = response.bufferFactory().wrap(responseBody.getBytes(StandardCharsets.UTF_8));
-        return response.writeWith(Mono.just(buffer));
+        return Mono.error(e);
     }
 }

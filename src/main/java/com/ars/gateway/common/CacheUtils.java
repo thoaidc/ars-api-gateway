@@ -1,7 +1,6 @@
 package com.ars.gateway.common;
 
 import com.dct.model.config.properties.RedisProps;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
@@ -65,7 +64,7 @@ public class CacheUtils {
 
         try {
             return objectMapper.readValue(cachedData, type);
-        } catch (JsonProcessingException e) {
+        } catch (Exception e) {
             log.warn("[PARSE_CACHED_DATA_ERROR] - Failed to parse cached data: {}", e.getMessage());
             evict(key);
             return null;
