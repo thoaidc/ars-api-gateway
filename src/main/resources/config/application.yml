@@ -30,7 +30,6 @@ management:
           - info
           - metrics
           - gateway
-          - circuitbreakers
           - redis
           - refresh
   endpoint:

@@ -49,29 +49,6 @@ spring:
             key-resolver: "#{@compositeKeyResolver}"
             deny-empty-key: false
             empty-key-status: TOO_MANY_REQUESTS
-        - name: CircuitBreaker # The name of the filter built into Spring Gateway, cannot be changed
-          args:
-            name: service-cb
-            fallbackUri: forward:/fallback/services/unavailable
-            statusCodes:
-              - 500
-              - 502
-              - 503
-            slowCallDurationThreshold: 5000ms
-            slowCallRateThreshold: 75
-        - name: Retry # The name of the filter built into Spring Gateway, cannot be changed
-          args:
-            retries: 5
-            statuses:
-              - BAD_GATEWAY
-              - SERVICE_UNAVAILABLE
-            methods:
-              - GET
-            backoff:
-              firstBackoff: 100ms
-              maxBackoff: 1000ms
-              factor: 2
-              basedOnPreviousValue: false
 
       # Route configurations
       routes:
@@ -124,24 +101,6 @@ spring:
       max-in-memory-size: 2MB
       max-disk-usage-per-part: 15MB
       max-parts: 64
-
-resilience4j:
-  circuitbreaker:
-    instances:
-      service-cb:
-        slidingWindowType: COUNT_BASED
-        slowCallDurationThreshold: 5s # If request call > 5s → considered slow
-        slowCallRateThreshold: 75     # If ≥75% of calls are delayed → open circuit
-        registerHealthIndicator: true # Allows exposing circuit breaker status via actuator /actuator/health
-        slidingWindowSize: 10     # Use a sliding window of size 10 most recent calls to calculate the error
-        minimumNumberOfCalls: 5   # Only start evaluating errors after at least 5 requests
-        # When circuit breaker opens → after timeout → switches to half-open state, allowing 3 retry requests for testing
-        permittedNumberOfCallsInHalfOpenState: 3
-        # After waitDurationInOpenState, automatically switch from open to half-open (no new request required)
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 5s   # When circuit is open, wait 5s before allowing retry
-        failureRateThreshold: 50      # If error rate > 50% in slidingWindowSize → open circuit (disconnect)
-        eventConsumerBufferSize: 10   # Circuit breaker status event log buffer (for monitoring, logging)
 
 # Eureka client configuration
 eureka:
