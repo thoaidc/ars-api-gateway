@@ -132,7 +132,6 @@ app:
     jwt:
       access-token:
         base64-secret-key: ${ARS_GATEWAY_SECURITY_KEY}
-        validity: 300000 # 5 minutes
   i18n:
     base-names:
       - classpath:i18n/messages

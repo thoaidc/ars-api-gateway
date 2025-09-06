@@ -136,7 +136,6 @@ app:
     jwt:
       access-token:
         base64-secret-key: ZGN0LWJhc2Utc2VjcmV0LWtleS1mb3ItYWNjZXNzLXRva2VuLXZhbGlkYXRpb24=
-        validity: 300000 # 5 minutes
   i18n:
     base-names:
       - classpath:i18n/messages
