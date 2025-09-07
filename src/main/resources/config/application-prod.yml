@@ -55,7 +55,7 @@ spring:
         - id: user-service-route
           uri: lb://USER-SERVICE
           predicates:
-            - Path=/api/v1/users/**,/api/p/v1/users/**,/api/v1/roles/**
+            - Path=/api/v1/users/**,/api/p/v1/users/**,/api/v1/roles/**,/login/**
             - Method=GET,POST,PUT,PATCH,DELETE
 
       # Load balancer configuration
@@ -128,6 +128,7 @@ app:
     public-request-patterns:
       - /favicon.ico
       - /api/p/**
+      - /login/**
       - /ws/**
     jwt:
       access-token:
