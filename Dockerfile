@@ -1,7 +1,7 @@
 # ==============================
 # STAGE 1: Build with Maven
 # ==============================
-FROM maven:3.8.5-openjdk-17 AS build
+FROM maven:3.9.11-eclipse-temurin-21 AS build
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ RUN mvn clean package -Pprod -DskipTests
 # ==============================
 # STAGE 2: Run JAR
 # ==============================
-FROM openjdk:17-jdk-slim
+FROM openjdk:21-jdk-slim
 
 WORKDIR /app
 
@@ -30,7 +30,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf 
 # Copy Spring Boot JAR from the build stage
 COPY --from=build /app/target/gateway-*.jar app.jar
 
-# Expose port 8080 for Spring Boot
 EXPOSE 8080
 
 # Start Spring Boot app
