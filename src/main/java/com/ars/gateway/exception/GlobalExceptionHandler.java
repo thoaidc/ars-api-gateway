@@ -25,7 +25,6 @@ import java.nio.charset.StandardCharsets;
 @Component
 @Order(-2)
 public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
-
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private final MessageTranslationUtils messageUtils;
 
@@ -36,7 +35,7 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
     @Override
     @NonNull
     public Mono<Void> handle(@NonNull ServerWebExchange exchange, @NonNull Throwable e) {
-        log.error("[GATEWAY_GLOBAL_EXCEPTION_HANDLER] - Handling error: {}", e.getMessage());
+        log.error("[GATEWAY_GLOBAL_EXCEPTION_HANDLER] - Handling error: {}", e.getMessage(), e);
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
         response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);

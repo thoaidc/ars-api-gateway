@@ -30,13 +30,11 @@ public class AuthenticationEntryPoint implements ServerAuthenticationEntryPoint 
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
         response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
-
         BaseResponseDTO responseDTO = BaseResponseDTO.builder()
                 .code(BaseHttpStatusConstants.UNAUTHORIZED)
                 .success(Boolean.FALSE)
                 .message(ex.getMessage())
                 .build();
-
         String responseBody = JsonUtils.toJsonString(responseDTO);
         DataBuffer buffer = response.bufferFactory().wrap(responseBody.getBytes(StandardCharsets.UTF_8));
         return response.writeWith(Mono.just(buffer));

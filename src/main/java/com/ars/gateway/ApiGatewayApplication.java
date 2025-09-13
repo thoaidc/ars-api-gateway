@@ -17,7 +17,6 @@ import java.util.Optional;
 @SpringBootApplication
 @EnableDiscoveryClient
 public class ApiGatewayApplication {
-
     private static final Logger log = LoggerFactory.getLogger(ApiGatewayApplication.class);
 
     /**

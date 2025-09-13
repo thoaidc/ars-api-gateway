@@ -1,8 +1,11 @@
 package com.ars.gateway.config;
 
+import com.ars.gateway.constants.CommonConstants;
+import com.dct.model.common.SecurityUtils;
 import com.dct.model.config.properties.RateLimiterProps;
 import com.dct.model.constants.BaseSecurityConstants;
 
+import org.apache.commons.codec.digest.MessageDigestAlgorithms;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -22,12 +25,7 @@ import java.util.Objects;
 @Configuration
 @EnableConfigurationProperties(RateLimiterProps.class)
 public class RateLimiterConfig {
-
     private static final Logger log = LoggerFactory.getLogger(RateLimiterConfig.class);
-    private static final String BEARER_PREFIX = BaseSecurityConstants.HEADER.TOKEN_TYPE;
-    private static final String X_FORWARDED_FOR = "X-Forwarded-For";
-    private static final String X_REAL_IP = "X-Real-IP";
-    private static final String USER_AGENT = "User-Agent";
     private final RateLimiterProps rateLimiterConfigs;
 
     public RateLimiterConfig(RateLimiterProps rateLimiterConfigs) {
@@ -43,7 +41,7 @@ public class RateLimiterConfig {
         // 1. Prioritize processing Authorization tokens first
         String authKey = resolveByAuthToken(exchange);
 
-        if (authKey != null) {
+        if (StringUtils.hasText(authKey)) {
             log.debug("[RATE_LIMIT_BY_TOKEN] - Using token with key: {}", authKey);
             return authKey;
         }
@@ -51,34 +49,29 @@ public class RateLimiterConfig {
         // 2. Combine User-Agent + IP
         String uaKey = resolveByUserAgentAndClientIP(exchange);
 
-        if (uaKey != null) {
+        if (StringUtils.hasText(uaKey)) {
             log.debug("[RATE_LIMIT_BY_IP] - Using User-Agent + IP with key: {}", uaKey);
             return uaKey;
         }
 
         // 3. Final fallback, aggregates all ambiguous requests to strictly limit
         log.debug("[RATE_LIMIT_ANONYMOUS_USER] - Resolved rate limit for anonymous user");
-        return "anonymous";
+        return CommonConstants.ANONYMOUS_USER;
     }
 
     private String resolveByAuthToken(ServerWebExchange exchange) {
-        String authHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
+        String token = SecurityUtils.retrieveTokenWebFlux(exchange.getRequest());
 
-        if (StringUtils.hasText(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
-            String token = authHeader.substring(BEARER_PREFIX.length()).trim();
-
-            if (StringUtils.hasText(token)) {
-                // Hash the token for security (not store full token in Redis)
-                String hashedToken = hashString(token);
-                return "token:" + hashedToken;
-            }
+        if (StringUtils.hasText(token)) {
+            // Hash the token for security (not store full token in Redis)
+            return hashString(token);
         }
 
         return null;
     }
 
     private String resolveByUserAgentAndClientIP(ServerWebExchange exchange) {
-        String userAgent = exchange.getRequest().getHeaders().getFirst(USER_AGENT);
+        String userAgent = exchange.getRequest().getHeaders().getFirst(BaseSecurityConstants.HEADER.USER_AGENT);
 
         if (StringUtils.hasText(userAgent)) {
             // Get IP as additional context for User-Agent based limiting
@@ -99,7 +92,7 @@ public class RateLimiterConfig {
     private String extractClientIp(ServerWebExchange exchange) {
         ServerHttpRequest request = exchange.getRequest();
         // Check X-Forwarded-For first (most common proxy header)
-        String xForwardedFor = request.getHeaders().getFirst(X_FORWARDED_FOR);
+        String xForwardedFor = request.getHeaders().getFirst(BaseSecurityConstants.HEADER.X_FORWARDED_FOR);
 
         if (StringUtils.hasText(xForwardedFor)) {
             // Get the first IP in the chain (original client IP)
@@ -113,7 +106,7 @@ public class RateLimiterConfig {
         }
 
         // Check X-Real-IP header (nginx proxy)
-        String xRealIp = request.getHeaders().getFirst(X_REAL_IP);
+        String xRealIp = request.getHeaders().getFirst(BaseSecurityConstants.HEADER.X_REAL_IP);
 
         if (StringUtils.hasText(xRealIp) && isValidIp(xRealIp.trim())) {
             return xRealIp.trim();
@@ -164,7 +157,7 @@ public class RateLimiterConfig {
 
     private String hashString(String input) {
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            MessageDigest md = MessageDigest.getInstance(MessageDigestAlgorithms.SHA_256);
             StringBuilder sb = new StringBuilder();
             byte[] hash = md.digest(input.getBytes());
 

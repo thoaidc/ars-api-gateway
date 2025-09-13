@@ -28,6 +28,7 @@
         </dependency>
 
         <!-- Spring Cloud Gateway -->
+        <!--suppress VulnerableLibrariesLocal -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-gateway</artifactId>
@@ -116,7 +117,6 @@
                 <profiles.active>dev</profiles.active>
             </properties>
         </profile>
-
         <profile>
             <id>prod</id>
             <properties>

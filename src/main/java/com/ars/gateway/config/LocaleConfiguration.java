@@ -18,7 +18,6 @@ import java.util.Optional;
 @Configuration
 @EnableConfigurationProperties(I18nProps.class)
 public class LocaleConfiguration {
-
     private static final Logger log = LoggerFactory.getLogger(LocaleConfiguration.class);
     private final I18nProps i18nProps;
 

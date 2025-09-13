@@ -25,7 +25,6 @@ import java.util.Objects;
 @EnableWebFluxSecurity
 @EnableConfigurationProperties({SecurityProps.class, CorsProps.class})
 public class GatewaySecurityConfig {
-
     private final ServerAuthenticationEntryPoint authenticationEntryPoint;
     private final ServerAccessDeniedHandler accessDeniedHandler;
     private final SecurityProps securityProps;

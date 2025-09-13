@@ -60,9 +60,8 @@ public class CacheUtils {
     }
 
     public <T> T get(String key, Class<T> type) {
-        String cachedData = get(key);
-
         try {
+            String cachedData = get(key);
             return objectMapper.readValue(cachedData, type);
         } catch (Exception e) {
             log.warn("[PARSE_CACHED_DATA_ERROR] - Failed to parse cached data: {}", e.getMessage());

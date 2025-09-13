@@ -41,14 +41,14 @@ spring:
           args:
             name: Cache-Control
             value: public, max-age=300
-        - name: RequestRateLimiter # The name of the filter built into Spring Gateway, cannot be changed
-          args:
-            redis-rate-limiter.replenishRate: 25
-            redis-rate-limiter.burstCapacity: 50
-            redis-rate-limiter.requestedTokens: 1
-            key-resolver: "#{@compositeKeyResolver}"
-            deny-empty-key: false
-            empty-key-status: TOO_MANY_REQUESTS
+#        - name: RequestRateLimiter # The name of the filter built into Spring Gateway, cannot be changed
+#          args:
+#            redis-rate-limiter.replenishRate: 25
+#            redis-rate-limiter.burstCapacity: 50
+#            redis-rate-limiter.requestedTokens: 1
+#            key-resolver: "#{@compositeKeyResolver}"
+#            deny-empty-key: false
+#            empty-key-status: TOO_MANY_REQUESTS
 
       # Route configurations
       routes:
@@ -83,16 +83,16 @@ spring:
       host: localhost
       port: 6379
       database: 0
-      timeout: 5s
+      timeout: 100ms
       connect-timeout: 10s
       lettuce:
         pool:
           enabled: true
-          max-active: 10
-          max-idle: 5
+          max-active: 5
+          max-idle: 2
           min-idle: 2
           max-wait: 1s
-          time-between-eviction-runs: 30s
+          time-between-eviction-runs: 10s
         shutdown-timeout: 100ms
       ssl:
         enabled: false
