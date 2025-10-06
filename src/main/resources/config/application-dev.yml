@@ -26,6 +26,9 @@ logging:
   file:
     path: opt/logs/gateway
 
+server:
+  port: 8080
+
 spring:
   cloud:
     config:
@@ -41,14 +44,6 @@ spring:
           args:
             name: Cache-Control
             value: public, max-age=300
-#        - name: RequestRateLimiter # The name of the filter built into Spring Gateway, cannot be changed
-#          args:
-#            redis-rate-limiter.replenishRate: 25
-#            redis-rate-limiter.burstCapacity: 50
-#            redis-rate-limiter.requestedTokens: 1
-#            key-resolver: "#{@compositeKeyResolver}"
-#            deny-empty-key: false
-#            empty-key-status: TOO_MANY_REQUESTS
 
       # Route configurations
       routes:
@@ -60,8 +55,15 @@ spring:
         - id: user-service-route
           uri: lb://USER-SERVICE
           predicates:
-            - Path=/api/v1/users/**, /api/p/v1/users/**,/api/v1/roles/**,/login/**
-            - Method=GET,POST,PUT,PATCH,DELETE
+            - Path=/api/v1/users/**, /api/p/v1/users/**, /login/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 10
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
 
       # Load balancer configuration
       loadbalancer:
@@ -82,9 +84,9 @@ spring:
     redis:
       host: localhost
       port: 6379
-      database: 0
+      database: 1
       timeout: 100ms
-      connect-timeout: 10s
+      connect-timeout: 500ms
       lettuce:
         pool:
           enabled: true
@@ -96,11 +98,6 @@ spring:
         shutdown-timeout: 100ms
       ssl:
         enabled: false
-  webflux:
-    multipart:
-      max-in-memory-size: 2MB
-      max-disk-usage-per-part: 15MB
-      max-parts: 64
 
 # Eureka client configuration
 eureka:
@@ -117,17 +114,7 @@ eureka:
     instanceId: ${spring.application.name}:${server.port}
 
 app:
-  rate-limiter:
-    ip-validation-enabled: true
-    excluded-ips:
-      - "127.0.0.1"
-      - "::1"
-      - "0:0:0:0:0:0:0:1"
-      - "host.docker.internal"
-    excluded-ip-prefixes:
-      - "192.168."
-      - "10."
-      - "172.16."
+  device-key: NDdiMDQ3Njg3NjNkMjJjYTVhMDQyNDgA # 32 characters
   security:
     public-request-patterns:
       - /favicon.ico
@@ -148,6 +135,7 @@ app:
       '[/**]':
         allowedOrigins:
           - "http://localhost:4200"
+          - "http://localhost:9000"
           - "http://localhost:8080"
         allowedMethods:
           - GET
@@ -161,13 +149,8 @@ app:
           - Authorization
           - Accept
           - Origin
-          - X-CSRF-Token
-          - X-Requested-With
           - Access-Control-Allow-Origin
-          - X-App-Version
+          - X-CSRF-Token
           - X-Device-ID
         allowCredentials: true
         maxAge: 3600  # Cache preflight response in 1 hour
-
-  redis:
-    ttl-minutes: 5

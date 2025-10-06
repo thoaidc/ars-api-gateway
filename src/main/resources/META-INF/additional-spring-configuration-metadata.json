@@ -1,0 +1,9 @@
+{
+  "properties": [
+    {
+      "name": "app.device-key",
+      "type": "java.lang.String",
+      "description": "Description for app.device-key."
+    }
+  ]
+}

@@ -17,13 +17,11 @@ spring:
   profiles:
     active: "@profiles.active@"
 
-server:
-  port: 8080
-
 # Actuator endpoints
 management:
   endpoints:
     web:
+      base-path: /actuator-gateway
       exposure:
         include:
           - health
@@ -34,9 +32,30 @@ management:
           - refresh
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState
   health:
     redis:
       enabled: false
     rabbit:
       enabled: false
+  metrics:
+    enable:
+      http: true
+      jvm: true
+      logback: true
+      process: true
+      system: true
+    distribution:
+      percentiles-histogram:
+        all: true
+      percentiles:
+        all: 0, 0.5, 0.75, 0.95, 0.99, 1.0
+    tags:
+      application: ${spring.application.name}
