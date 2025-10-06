@@ -2,7 +2,6 @@ package com.ars.gateway.exception;
 
 import com.dct.model.common.JsonUtils;
 import com.dct.model.common.MessageTranslationUtils;
-import com.dct.model.constants.BaseHttpStatusConstants;
 import com.dct.model.dto.response.BaseResponseDTO;
 import com.dct.model.exception.BaseException;
 
@@ -40,7 +39,7 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
         response.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR);
         response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
         BaseResponseDTO.Builder responseBuilder = BaseResponseDTO.builder()
-                .code(BaseHttpStatusConstants.INTERNAL_SERVER_ERROR)
+                .code(HttpStatus.INTERNAL_SERVER_ERROR.value())
                 .success(Boolean.FALSE)
                 .message(e.getMessage());
 

@@ -1,8 +1,6 @@
 package com.ars.gateway.common;
 
-import com.dct.model.config.properties.RedisProps;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -18,12 +16,10 @@ public class CacheUtils {
     private static final Logger log = LoggerFactory.getLogger(CacheUtils.class);
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
-    private final RedisProps redisProps;
 
-    public CacheUtils(RedisTemplate<String, String> redisTemplate, ObjectMapper objectMapper, RedisProps redisProps) {
+    public CacheUtils(RedisTemplate<String, String> redisTemplate, ObjectMapper objectMapper) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
-        this.redisProps = redisProps;
     }
 
     public String hashKey(String key) {
@@ -31,7 +27,7 @@ public class CacheUtils {
     }
 
     public void cache(String key, Object data) {
-        cache(key, data, redisProps.getTtlMinutes());
+        cache(key, data, 5);
     }
 
     public void cache(String key, Object data, int ttlMinutes) {
@@ -60,8 +56,9 @@ public class CacheUtils {
     }
 
     public <T> T get(String key, Class<T> type) {
+        String cachedData = get(key);
+
         try {
-            String cachedData = get(key);
             return objectMapper.readValue(cachedData, type);
         } catch (Exception e) {
             log.warn("[PARSE_CACHED_DATA_ERROR] - Failed to parse cached data: {}", e.getMessage());
