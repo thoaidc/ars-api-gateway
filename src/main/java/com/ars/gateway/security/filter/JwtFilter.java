@@ -3,13 +3,12 @@ package com.ars.gateway.security.filter;
 import com.ars.gateway.constants.CommonConstants;
 import com.dct.model.common.JsonUtils;
 import com.dct.model.common.SecurityUtils;
-import com.dct.model.config.properties.SecurityProps;
 import com.dct.model.constants.BaseHttpStatusConstants;
+import com.dct.model.dto.auth.BaseUserDTO;
 import com.dct.model.dto.response.BaseResponseDTO;
 import com.dct.model.exception.BaseException;
 
 import io.jsonwebtoken.JwtException;
-import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -18,9 +17,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.lang.NonNull;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
@@ -32,11 +33,9 @@ import java.nio.charset.StandardCharsets;
 public class JwtFilter implements WebFilter {
     private static final Logger log = LoggerFactory.getLogger(JwtFilter.class);
     private final JwtProvider jwtProvider;
-    private final String[] publicPatterns;
 
-    public JwtFilter(JwtProvider jwtProvider, SecurityProps securityProps) {
+    public JwtFilter(JwtProvider jwtProvider) {
         this.jwtProvider = jwtProvider;
-        this.publicPatterns = securityProps.getPublicRequestPatterns();
     }
 
     @Override
@@ -44,20 +43,25 @@ public class JwtFilter implements WebFilter {
     public Mono<Void> filter(@NonNull ServerWebExchange exchange, @NonNull WebFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
         log.debug("[GATEWAY_JWT_FILTER] - Filtering request: {}", path);
+        String token = SecurityUtils.retrieveTokenWebFlux(exchange.getRequest());
 
-        if (SecurityUtils.checkIfAuthenticationNotRequired(path, publicPatterns)) {
-            return chain.filter(exchange);
+        if (StringUtils.hasText(token)) {
+            return jwtProvider.validateToken(token)
+                    .flatMap(userDTO -> setAuthentication(exchange, chain, userDTO))
+                    .onErrorResume(error -> handleUnauthorized(exchange, error));
         }
 
-        String token = StringUtils.trimToNull(SecurityUtils.retrieveTokenWebFlux(exchange.getRequest()));
-        return jwtProvider.validateToken(token)
-                .flatMap(authentication -> setAuthentication(exchange, chain, authentication))
-                .onErrorResume(error -> handleUnauthorized(exchange, error));
+        return chain.filter(exchange);
     }
 
-    private Mono<Void> setAuthentication(ServerWebExchange exchange, WebFilterChain chain, Authentication auth) {
-        exchange.getAttributes().put(CommonConstants.AUTHENTICATION_EXCHANGE_ATTRIBUTE, auth);
-        return chain.filter(exchange).contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth));
+    private Mono<Void> setAuthentication(ServerWebExchange exchange, WebFilterChain chain, BaseUserDTO userDTO) {
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+            userDTO,
+            userDTO.getUsername(),
+            userDTO.getAuthorities()
+        );
+        exchange.getAttributes().put(CommonConstants.AUTHENTICATION_EXCHANGE_ATTRIBUTE, authentication);
+        return chain.filter(exchange).contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication));
     }
 
     private Mono<Void> handleUnauthorized(ServerWebExchange exchange, Throwable e) {

@@ -1,5 +1,7 @@
 package com.ars.gateway.dto;
 
+import com.ars.gateway.security.ratelimiter.RateLimiterConfig;
+
 import java.util.List;
 
 @SuppressWarnings("unused")
@@ -7,37 +9,7 @@ public class RouteConfigDTO {
     private String routeId;
     private String uri;
     private List<String> predicates;
-    private RateLimiter rate = new RateLimiter();
-
-    public static class RateLimiter {
-        private Integer banThreshold;
-        private Integer windowSeconds;
-        private Integer banDurationMinutes;
-
-        public Integer getBanThreshold() {
-            return banThreshold;
-        }
-
-        public void setBanThreshold(Integer banThreshold) {
-            this.banThreshold = banThreshold;
-        }
-
-        public Integer getWindowSeconds() {
-            return windowSeconds;
-        }
-
-        public void setWindowSeconds(Integer windowSeconds) {
-            this.windowSeconds = windowSeconds;
-        }
-
-        public Integer getBanDurationMinutes() {
-            return banDurationMinutes;
-        }
-
-        public void setBanDurationMinutes(Integer banDurationMinutes) {
-            this.banDurationMinutes = banDurationMinutes;
-        }
-    }
+    private RateLimiterConfig rate = new RateLimiterConfig();
 
     public String getRouteId() {
         return routeId;
@@ -63,11 +35,11 @@ public class RouteConfigDTO {
         this.predicates = predicates;
     }
 
-    public RateLimiter getRate() {
+    public RateLimiterConfig getRate() {
         return rate;
     }
 
-    public void setRate(RateLimiter rate) {
+    public void setRate(RateLimiterConfig rate) {
         this.rate = rate;
     }
 }

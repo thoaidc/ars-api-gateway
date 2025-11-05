@@ -1,5 +1,9 @@
 package com.ars.gateway.service;
 
+import java.util.List;
+
 public interface RateLimitConfigService {
-    void updateRateLimitConfig();
+    boolean refreshRateLimitConfig();
+    void refreshRateLimitExcludedApis();
+    List<String> getDefaultRateExcludedApis();
 }

@@ -1,46 +1,63 @@
 package com.ars.gateway.security.filter;
 
-import com.ars.gateway.common.CacheUtils;
 import com.dct.model.config.properties.SecurityProps;
 import com.dct.model.constants.BaseExceptionConstants;
+import com.dct.model.constants.BaseSecurityConstants;
+import com.dct.model.dto.auth.BaseUserDTO;
 import com.dct.model.exception.BaseBadRequestException;
+import com.dct.model.exception.BaseIllegalArgumentException;
 import com.dct.model.security.AbstractJwtProvider;
 
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
+import io.jsonwebtoken.Claims;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Component
 public class JwtProvider extends AbstractJwtProvider {
     private static final String ENTITY_NAME = "com.ars.gateway.security.filter.JwtProvider";
-    private final CacheUtils cacheUtils;
+    private static final Logger log = LoggerFactory.getLogger(JwtProvider.class);
 
-    public JwtProvider(SecurityProps securityProps, CacheUtils cacheUtils) {
+    public JwtProvider(SecurityProps securityProps) {
         super(securityProps);
-        this.cacheUtils = cacheUtils;
     }
 
-    public Mono<Authentication> validateToken(String token) {
+    public Mono<BaseUserDTO> validateToken(String token) {
         if (!StringUtils.hasText(token)) {
             return Mono.error(new BaseBadRequestException(ENTITY_NAME, BaseExceptionConstants.BAD_CREDENTIALS));
         }
 
-        return getAuthenticationFromCacheOrParse(token);
+        return Mono.fromCallable(() -> getAuthentication(token)).subscribeOn(Schedulers.boundedElastic());
     }
 
-    private Mono<Authentication> getAuthenticationFromCacheOrParse(String token) {
-        return Mono.fromCallable(() -> (Authentication) cacheUtils.get(token, UsernamePasswordAuthenticationToken.class))
-                .subscribeOn(Schedulers.boundedElastic())
-                .switchIfEmpty(parseAndCache(token));
-    }
+    private BaseUserDTO getAuthentication(String token) {
+        try {
+            Claims claims = parseToken(super.accessTokenParser, token);
+            Integer userId = (Integer) claims.get(BaseSecurityConstants.TOKEN_PAYLOAD.USER_ID);
+            Integer shopId = (Integer) claims.get(BaseSecurityConstants.TOKEN_PAYLOAD.SHOP_ID);
+            String username = (String) claims.get(BaseSecurityConstants.TOKEN_PAYLOAD.USERNAME);
+            String authoritiesStr = (String) claims.get(BaseSecurityConstants.TOKEN_PAYLOAD.AUTHORITIES);
+            Set<String> authorities = Arrays.stream(authoritiesStr.split(","))
+                    .map(String::trim).
+                    collect(Collectors.toSet());
 
-    private Mono<Authentication> parseAndCache(String token) {
-        return Mono.fromCallable(() -> super.validateAccessToken(token))
-                .subscribeOn(Schedulers.boundedElastic())
-                .doOnNext(authentication -> cacheUtils.cache(token, authentication));
+            return BaseUserDTO.userBuilder()
+                    .withId(userId)
+                    .withShopId(shopId)
+                    .withUsername(username)
+                    .withAuthorities(authorities)
+                    .build();
+        } catch (Exception e) {
+            log.error("[JWT_PROVIDER_GET_AUTHENTICATION_ERROR] - error: {}", e.getMessage());
+            throw new BaseIllegalArgumentException(ENTITY_NAME, "Could not get authentication from token");
+        }
     }
 }

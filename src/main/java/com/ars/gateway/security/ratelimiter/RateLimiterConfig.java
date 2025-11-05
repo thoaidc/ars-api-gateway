@@ -45,6 +45,6 @@ public class RateLimiterConfig {
 
     @Override
     public String toString() {
-        return "[banThreshold=" + banThreshold + ", windowSeconds=" + windowSeconds + "]";
+        return "[banThreshold=" + banThreshold + ", windowSeconds=" + windowSeconds + ", banTime=" + banDurationMinutes + "]";
     }
 }

@@ -3,6 +3,7 @@ package com.ars.gateway.service.impl;
 import com.ars.gateway.constants.RateLimitConstants;
 import com.ars.gateway.dto.RouteConfigDTO;
 import com.ars.gateway.security.ratelimiter.CustomRateLimiter;
+import com.ars.gateway.security.ratelimiter.RateLimiterConfig;
 import com.ars.gateway.service.RouteConfigService;
 
 import org.springframework.cloud.gateway.config.GatewayProperties;
@@ -41,24 +42,24 @@ public class RouteConfigServiceImpl implements RouteConfigService {
         return predicateName + "=" + predicateValue;
     }
 
-    private RouteConfigDTO.RateLimiter convertRateLimiterConfig(RouteDefinition routeDefinition) {
+    private RateLimiterConfig convertRateLimiterConfig(RouteDefinition routeDefinition) {
         return routeDefinition.getFilters()
             .stream()
             .filter(filter -> CustomRateLimiter.class.getSimpleName().equalsIgnoreCase(filter.getName()))
             .findFirst()
             .map(this::convertRateLimiterConfig)
-            .orElseGet(RouteConfigDTO.RateLimiter::new);
+            .orElseGet(RateLimiterConfig::new);
     }
 
-    private RouteConfigDTO.RateLimiter convertRateLimiterConfig(FilterDefinition filterDefinition) {
+    private RateLimiterConfig convertRateLimiterConfig(FilterDefinition filterDefinition) {
         try {
-            RouteConfigDTO.RateLimiter rateLimiterConfig = new RouteConfigDTO.RateLimiter();
+            RateLimiterConfig rateLimiterConfig = new RateLimiterConfig();
             String banThreshold = filterDefinition.getArgs().get(RateLimitConstants.BAN_THRESHOLD_PROPERTIES);
             String windowSeconds = filterDefinition.getArgs().get(RateLimitConstants.WINDOW_SECONDS_PROPERTIES);
             String banDurationMinutes = filterDefinition.getArgs().get(RateLimitConstants.BAN_DURATION_MINUTES_PROPERTIES);
-            rateLimiterConfig.setBanThreshold(Integer.valueOf(banThreshold));
-            rateLimiterConfig.setWindowSeconds(Integer.valueOf(windowSeconds));
-            rateLimiterConfig.setBanDurationMinutes(Integer.valueOf(banDurationMinutes));
+            rateLimiterConfig.setBanThreshold(Integer.parseInt(banThreshold));
+            rateLimiterConfig.setWindowSeconds(Integer.parseInt(windowSeconds));
+            rateLimiterConfig.setBanDurationMinutes(Integer.parseInt(banDurationMinutes));
             return rateLimiterConfig;
         } catch (Exception ignored) {
             return null;
