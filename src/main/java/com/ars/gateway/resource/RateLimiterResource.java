@@ -1,7 +1,7 @@
 package com.ars.gateway.resource;
 
 import com.ars.gateway.service.RateLimitConfigService;
-import com.dct.model.constants.BaseSecurityConstants;
+import com.dct.model.constants.BaseRoleConstants;
 import com.dct.model.dto.response.BaseResponseDTO;
 
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,20 +23,20 @@ public class RateLimiterResource {
     }
 
     @PostMapping("/refresh")
-    @PreAuthorize("hasAuthority('" + BaseSecurityConstants.Role.SUPER_ADMIN + "')")
+    @PreAuthorize("hasAuthority('" + BaseRoleConstants.System.SYSTEM + "')")
     public Mono<BaseResponseDTO> refreshRateLimitConfig() {
         rateLimitConfigService.refreshRateLimitConfig();
         return Mono.just(BaseResponseDTO.builder().ok());
     }
 
     @GetMapping("/excluded")
-    @PreAuthorize("hasAuthority('" + BaseSecurityConstants.Role.SUPER_ADMIN + "')")
+    @PreAuthorize("hasAuthority('" + BaseRoleConstants.System.SYSTEM + "')")
     public Mono<List<String>> getDefaultRateExcludedApis() {
         return Mono.just(rateLimitConfigService.getDefaultRateExcludedApis());
     }
 
     @PostMapping("/excluded")
-    @PreAuthorize("hasAuthority('" + BaseSecurityConstants.Role.SUPER_ADMIN + "')")
+    @PreAuthorize("hasAuthority('" + BaseRoleConstants.System.SYSTEM + "')")
     public Mono<BaseResponseDTO> updateRateExcludedApis() {
         rateLimitConfigService.refreshRateLimitExcludedApis();
         return Mono.just(BaseResponseDTO.builder().ok());

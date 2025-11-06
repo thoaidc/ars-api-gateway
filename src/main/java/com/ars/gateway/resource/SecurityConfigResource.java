@@ -1,7 +1,7 @@
 package com.ars.gateway.resource;
 
 import com.ars.gateway.service.RequestAuthorizationManagementService;
-import com.dct.model.constants.BaseSecurityConstants;
+import com.dct.model.constants.BaseRoleConstants;
 import com.dct.model.dto.response.BaseResponseDTO;
 
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,13 +23,13 @@ public class SecurityConfigResource {
     }
 
     @GetMapping("/public-request-patterns")
-    @PreAuthorize("hasAuthority('" + BaseSecurityConstants.Role.SUPER_ADMIN + "')")
+    @PreAuthorize("hasAuthority('" + BaseRoleConstants.System.SYSTEM + "')")
     public Mono<List<String>> getPublicRequestPatterns() {
         return Mono.just(requestAuthorizationManagementService.getDefaultPublicRequestsConfig());
     }
 
     @PostMapping("/public-request-patterns")
-    @PreAuthorize("hasAuthority('" + BaseSecurityConstants.Role.SUPER_ADMIN + "')")
+    @PreAuthorize("hasAuthority('" + BaseRoleConstants.System.SYSTEM + "')")
     public Mono<BaseResponseDTO> refreshPublicRequestPatterns() {
         requestAuthorizationManagementService.refreshPublicRequestsConfig();
         return Mono.just(BaseResponseDTO.builder().ok());

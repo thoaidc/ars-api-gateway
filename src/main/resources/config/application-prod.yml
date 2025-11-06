@@ -85,6 +85,19 @@ spring:
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
+        - id: admin-service-route
+          uri: lb://ADMIN-SERVICE
+          predicates:
+            - Path=/api/v1/admin/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 10
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
+
       # Load balancer configuration
       loadbalancer:
         use404: true

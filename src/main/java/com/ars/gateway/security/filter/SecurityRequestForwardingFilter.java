@@ -69,25 +69,24 @@ public class SecurityRequestForwardingFilter implements GlobalFilter, Ordered {
         }
 
         log.debug("[HEADER_SECURITY_FORWARD] - Forward request: {}: {}", exchange.getRequest().getMethod(), requestUri);
-        Authentication authentication = exchange.getAttribute(CommonConstants.AUTHENTICATION_EXCHANGE_ATTRIBUTE);
+        BaseUserDTO userDTO = exchange.getAttribute(CommonConstants.AUTHENTICATION_EXCHANGE_ATTRIBUTE);
+        String token = exchange.getAttribute(CommonConstants.TOKEN_EXCHANGE_ATTRIBUTE);
 
-        if (Objects.isNull(authentication)) {
+        if (Objects.isNull(userDTO)) {
             return Mono.error(new BaseAuthenticationException(ENTITY_NAME, "Authentication not found!"));
         }
 
-        BaseUserDTO userDTO = (BaseUserDTO) authentication.getPrincipal();
         Set<String> userPermissions = userDTO.getAuthorities()
                 .stream()
                 .map(GrantedAuthority::getAuthority)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toSet());
-
         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                 .header(BaseSecurityConstants.HEADER.USER_ID, String.valueOf(userDTO.getId()))
                 .header(BaseSecurityConstants.HEADER.USER_NAME, userDTO.getUsername())
                 .header(BaseSecurityConstants.HEADER.USER_AUTHORITIES, String.join(",", userPermissions))
+                .header(BaseSecurityConstants.HEADER.AUTHORIZATION_HEADER, token)
                 .build();
-
         return chain.filter(exchange.mutate().request(mutatedRequest).build());
     }
 

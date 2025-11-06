@@ -44,8 +44,10 @@ public class JwtFilter implements WebFilter {
         String path = exchange.getRequest().getURI().getPath();
         log.debug("[GATEWAY_JWT_FILTER] - Filtering request: {}", path);
         String token = SecurityUtils.retrieveTokenWebFlux(exchange.getRequest());
+        System.out.println(token);
 
         if (StringUtils.hasText(token)) {
+            exchange.getAttributes().put(CommonConstants.TOKEN_EXCHANGE_ATTRIBUTE, token);
             return jwtProvider.validateToken(token)
                     .flatMap(userDTO -> setAuthentication(exchange, chain, userDTO))
                     .onErrorResume(error -> handleUnauthorized(exchange, error));
@@ -60,7 +62,8 @@ public class JwtFilter implements WebFilter {
             userDTO.getUsername(),
             userDTO.getAuthorities()
         );
-        exchange.getAttributes().put(CommonConstants.AUTHENTICATION_EXCHANGE_ATTRIBUTE, authentication);
+        System.out.println(userDTO.getAuthorities());
+        exchange.getAttributes().put(CommonConstants.AUTHENTICATION_EXCHANGE_ATTRIBUTE, userDTO);
         return chain.filter(exchange).contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication));
     }
 

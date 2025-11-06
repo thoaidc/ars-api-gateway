@@ -2,7 +2,8 @@ package com.ars.gateway.resource;
 
 import com.ars.gateway.dto.RouteConfigDTO;
 import com.ars.gateway.service.RouteConfigService;
-import com.dct.model.constants.BaseSecurityConstants;
+import com.dct.model.constants.BaseRoleConstants;
+
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,7 +20,7 @@ public class RouteConfigResource {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('" + BaseSecurityConstants.Role.SUPER_ADMIN + "')")
+    @PreAuthorize("hasAuthority('" + BaseRoleConstants.System.SYSTEM + "')")
     public Flux<RouteConfigDTO> getRoutesConfig() {
         return Flux.fromIterable(routeConfigService.getRoutesConfig());
     }
