@@ -42,7 +42,7 @@ public class JwtFilter implements WebFilter {
     @NonNull
     public Mono<Void> filter(@NonNull ServerWebExchange exchange, @NonNull WebFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
-        log.debug("[GATEWAY_JWT_FILTER] - Filtering request: {}", path);
+        log.debug("[GATEWAY_JWT_FILTER] - Filtering request: {} {}", exchange.getRequest().getMethod(), path);
         String token = SecurityUtils.retrieveTokenWebFlux(exchange.getRequest());
         System.out.println(token);
 

@@ -42,7 +42,7 @@ public class EncryptionUtils {
             String deviceIdDecoded = decrypt(deviceId);
             return new CheckValidDeviceIdResponseDTO(deviceIdDecoded, true);
         } catch (Exception e) {
-            log.error("[COULD_NOT_DECRYPT_DEVICE_ID] - error: ", e);
+            log.error("[COULD_NOT_DECRYPT_DEVICE_ID] - error: {}", e.getMessage());
             return new CheckValidDeviceIdResponseDTO(deviceId, false);
         }
     }
