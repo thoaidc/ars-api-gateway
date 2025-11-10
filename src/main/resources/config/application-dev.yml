@@ -79,8 +79,6 @@ spring:
           predicates:
             - Path=/api/v1/users/**, /api/p/v1/users/**, /login/**
           filters:
-            - RemoveRequestHeader=Cookie
-            - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
                 rate-limiter.banThreshold: 10
@@ -91,6 +89,71 @@ spring:
           uri: lb://ADMIN-SERVICE
           predicates:
             - Path=/api/v1/admin/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 10
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
+
+        - id: product-service-route
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/api/v1/products/**, /api/p/v1/products/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 10
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
+
+        - id: order-service-route
+          uri: lb://ORDER-SERVICE
+          predicates:
+            - Path=/api/v1/orders/**, /api/p/v1/orders/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 10
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
+
+        - id: payment-service-route
+          uri: lb://PAYMENT-SERVICE
+          predicates:
+            - Path=/api/v1/payments/**, /api/p/v1/payments/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 10
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
+
+        - id: notification-service-route
+          uri: lb://NOTIFICATION-SERVICE
+          predicates:
+            - Path=/api/v1/notifications/**, /api/p/v1/notifications/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 10
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
+
+        - id: report-service-route
+          uri: lb://REPORT-SERVICE
+          predicates:
+            - Path=/api/v1/reports/**, /api/p/v1/reports/**
           filters:
             - RemoveRequestHeader=Cookie
             - RemoveRequestHeader=Set-Cookie
