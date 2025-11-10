@@ -60,6 +60,10 @@ public class DynamicPublicRequestContext {
         return GatewaySecurityUtils.buildAuthorizationDecision(authentication, isPublicPath);
     }
 
+    public boolean isPublicPath(String path) {
+        return SecurityUtils.checkIfAuthenticationNotRequired(path, publicPaths);
+    }
+
     /**
      * Updates the set of dynamic public paths at runtime
      * @param newPaths a collection of new public request paths
