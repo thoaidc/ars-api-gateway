@@ -66,6 +66,10 @@ spring:
           args:
             name: Cache-Control
             value: public, max-age=300
+        - name: AddResponseHeader
+          args:
+            name: X-Gateway-Downstream
+            value: v1
 
       # Route configurations
       routes:

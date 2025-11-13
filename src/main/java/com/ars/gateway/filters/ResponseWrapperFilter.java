@@ -1,6 +1,7 @@
 package com.ars.gateway.filters;
 
 import com.ars.gateway.common.LocaleUtils;
+import com.ars.gateway.constants.CommonConstants;
 import com.dct.model.common.MessageTranslationUtils;
 import com.dct.model.dto.response.BaseResponseDTO;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -21,6 +22,7 @@ import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.http.server.reactive.ServerHttpResponseDecorator;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
@@ -33,6 +35,63 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * A global {@link WebFilter} that intercepts HTTP requests and responses in a Spring WebFlux application <p>
+ *
+ * <b>Flow and Capabilities:</b>
+ * <ul>
+ *     <li>
+ *         This filter runs <b>before the request is routed to any downstream service</b>,
+ *         meaning it can inspect and modify request headers and query parameters before the downstream routing filter
+ *         (such as Gateway routing filters) is executed, but <b>cannot modify the body of requests going downstream</b>
+ *     </li>
+ *     <li>
+ *         It also wraps the {@link ServerHttpResponse}, allowing it to intercept and modify the response
+ *         <b>after it returns from downstream services or internal controllers</b>, but <b>before it is sent to the client</b>
+ *     </li>
+ *     <li>
+ *         Effectively, it can only read the request headers/body prior to downstream routing, but can fully inspect
+ *         and transform the response after controller or once it comes back from downstream or controller processing
+ *     </li>
+ * </ul>
+ *
+ * <b>In this case:</b>
+ * <ul>
+ *     <li>Only handle responses from internal gateway controllers</li>
+ *     <li>Localize message for response according to i18n standard</li>
+ *     <li>
+ *         Ignore response transformations if they are from downstream services
+ *         or have content that is not in the JSON raw or {@link BaseResponseDTO} format
+ *     </li>
+ * </ul>
+ *
+ * <p>
+ * <b>Integration details:</b>
+ * <ul>
+ *     <li>Registered as a Spring Bean via {@link Component}, applied globally</li>
+ *     <li>Implements {@link Ordered} with level = LOWEST_PRECEDENCE, so other filters (e.g., security) run first</li>
+ *     <li>Locale is set per request via {@link LocaleUtils#setLocale} and reset after the response completes</li>
+ * </ul>
+ *
+ * <p><b>Example usage:</b>
+ * <pre>
+ * {@code
+ *      @RestController
+ *      public class MyController {
+ *          @GetMapping("/api/data")
+ *          public Mono<BaseResponseDTO> getData() {
+ *              return Mono.just(new BaseResponseDTO(...));
+ *          }
+ *      }
+ * }
+ * </pre>
+ *
+ * The response body from this controller will automatically be processed by
+ * ResponseWrapperFilter to include translated messages if available
+ * </p>
+ *
+ * @author thoaidc
+ */
 @Component
 public class ResponseWrapperFilter implements WebFilter, Ordered {
     private final Logger log = LoggerFactory.getLogger(ResponseWrapperFilter.class);
@@ -70,6 +129,13 @@ public class ResponseWrapperFilter implements WebFilter, Ordered {
 
     private boolean shouldHandle(ServerHttpResponse response) {
         HttpHeaders headers = response.getHeaders();
+        String isDownstreamServiceHeader = headers.getFirst(CommonConstants.DOWNSTREAM_SERVICE_HEADER);
+
+        // Check if response header is attached from downstream gateway routing filter -> do not handle
+        if (StringUtils.hasText(isDownstreamServiceHeader)) {
+            return false;
+        }
+
         List<String> contentEncodings = headers.get(HttpHeaders.CONTENT_ENCODING);
         List<String> mediaTypes = headers.get(HttpHeaders.CONTENT_TYPE);
 
@@ -78,6 +144,7 @@ public class ResponseWrapperFilter implements WebFilter, Ordered {
             return false;
         }
 
+        // If the data type cannot be determined (due to media type null) - > do not handle
         if (Objects.isNull(mediaTypes) || mediaTypes.isEmpty()) {
             return false;
         }
