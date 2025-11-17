@@ -31,24 +31,35 @@ public class RateLimitConfigServiceImpl implements RateLimitConfigService {
     }
 
     private List<RateLimitConfigDTO> getRateLimitConfig() {
-        String redisConfig = stringRedisTemplate.opsForValue().get(RateLimitConstants.CONFIG_RATE_LIMIT_CODE);
+        try {
+            String redisConfig = stringRedisTemplate.opsForValue().get(RateLimitConstants.CONFIG_RATE_LIMIT_CODE);
 
-        if (StringUtils.hasText(redisConfig)) {
-            return JsonUtils.parseJsonToList(redisConfig, RateLimitConfigDTO.class);
+            if (StringUtils.hasText(redisConfig)) {
+                return JsonUtils.parseJsonToList(redisConfig, RateLimitConfigDTO.class);
+            }
+
+            return new ArrayList<>();
+        } catch (Exception e) {
+            log.warn("[RATE_LIMIT_CONFIG] - Failed to get RateLimiterConfig from Redis: {}", e.getMessage());
         }
 
         return new ArrayList<>();
     }
 
     private String[] getRateExcludedApis() {
-        String redisConfig = stringRedisTemplate.opsForValue().get(RateLimitConstants.RATE_LIMIT_EXCLUDED_APIS);
-        String[] excludedApis = null;
+        try {
+            String redisConfig = stringRedisTemplate.opsForValue().get(RateLimitConstants.RATE_LIMIT_EXCLUDED_APIS);
+            String[] excludedApis = null;
 
-        if (StringUtils.hasText(redisConfig)) {
-            excludedApis = JsonUtils.parseJson(redisConfig, String[].class);
+            if (StringUtils.hasText(redisConfig)) {
+                excludedApis = JsonUtils.parseJson(redisConfig, String[].class);
+            }
+
+            return Optional.ofNullable(excludedApis).orElse(defaultExcludedApis);
+        } catch (Exception e) {
+            log.warn("[RATE_LIMIT_CONFIG] - Failed to get excluded APIs from Redis: {}", e.getMessage());
+            return defaultExcludedApis;
         }
-
-        return Optional.ofNullable(excludedApis).orElse(defaultExcludedApis);
     }
 
     @Override
