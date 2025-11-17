@@ -10,6 +10,8 @@ import org.springframework.cloud.gateway.filter.ratelimit.AbstractRateLimiter;
 import org.springframework.cloud.gateway.support.ConfigurationService;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
 import reactor.core.publisher.Mono;
@@ -17,7 +19,6 @@ import reactor.core.publisher.Mono;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.ars.gateway.constants.RateLimitConstants.RATE_LIMIT_EXCLUDED_APIS;
@@ -30,6 +31,15 @@ public class CustomRateLimiter extends AbstractRateLimiter<RateLimiterConfig> {
     private static final Map<String, String[]> rateLimitExcludedApis = new ConcurrentHashMap<>();
     private final StringRedisTemplate redisTemplate;
     private final String[] defaultExcludedApis;
+    private final RedisScript<Long> rateLimitScript;
+    // Lua script to ensure atomic increment + expire
+    private static final String LUA_RATE_LIMIT_SCRIPT = """
+        local current = redis.call('INCR', KEYS[1])
+        if current == 1 then
+            redis.call('EXPIRE', KEYS[1], ARGV[1])
+        end
+        return current
+    """;
 
     public CustomRateLimiter(StringRedisTemplate redisTemplate,
                              ConfigurationService configService,
@@ -37,6 +47,7 @@ public class CustomRateLimiter extends AbstractRateLimiter<RateLimiterConfig> {
         super(RateLimiterConfig.class, RateLimitConstants.RATE_LIMIT_PROPERTIES_PREFIX, configService);
         this.redisTemplate = redisTemplate;
         this.defaultExcludedApis = securityProps.getRateLimitExcludedApis();
+        this.rateLimitScript = new DefaultRedisScript<>(LUA_RATE_LIMIT_SCRIPT, Long.class);
     }
 
     // For dynamic update config in runtime
@@ -58,7 +69,7 @@ public class CustomRateLimiter extends AbstractRateLimiter<RateLimiterConfig> {
      */
     @Override
     public Mono<Response> isAllowed(String routeId, String id) {
-        return Mono.fromSupplier(() -> {
+        return Mono.fromCallable(() -> {
             String[] excludedApis = rateLimitExcludedApis.getOrDefault(RATE_LIMIT_EXCLUDED_APIS, defaultExcludedApis);
 
             if (SecurityUtils.checkPathMatches(routeId, excludedApis)) {
@@ -77,13 +88,16 @@ public class CustomRateLimiter extends AbstractRateLimiter<RateLimiterConfig> {
             }
 
             // Redis key to count requests within a fixed window
-            String requestRateLimitKey = RateLimitConstants.RATE_LIMIT_KEY + routeId + id;
-            Long requestCounted = redisTemplate.opsForValue().increment(requestRateLimitKey);
-            // Set the window expiration (e.g., 1 seconds)
-            redisTemplate.expire(requestRateLimitKey, Duration.ofSeconds(rateLimiterConfig.getWindowSeconds()));
+            String requestRateLimitKey = RateLimitConstants.RATE_LIMIT_KEY + routeId + ":" + id;
+            // Atomic increment + expire using Lua script. Set the window expiration (e.g., 1 seconds)
+            Long requestCounted = redisTemplate.execute(
+                rateLimitScript,
+                Collections.singletonList(requestRateLimitKey),
+                String.valueOf(rateLimiterConfig.getWindowSeconds())
+            );
 
             // If the request count exceeds the threshold, ban the client temporarily
-            if (Objects.nonNull(requestCounted) && requestCounted > rateLimiterConfig.getBanThreshold()) {
+            if (requestCounted > rateLimiterConfig.getBanThreshold()) {
                 log.info("[REQUEST_NOW_BANNED] - start banning device: {}", clientBanned);
                 Duration blockingTime = Duration.ofMinutes(rateLimiterConfig.getBanDurationMinutes());
                 redisTemplate.opsForValue().set(clientBanned, RateLimitConstants.BANNED_VALUE, blockingTime);
@@ -92,6 +106,9 @@ public class CustomRateLimiter extends AbstractRateLimiter<RateLimiterConfig> {
 
             // Otherwise, allow the request
             return new Response(RateLimitConstants.REQUEST_ALLOWED, Collections.emptyMap());
+        }).onErrorResume(exception -> {
+            log.error("[RATE_LIMITER_REDIS_ERROR] - Allowed requests because Redis error: {}", exception.getMessage());
+            return Mono.just(new Response(RateLimitConstants.REQUEST_ALLOWED, Collections.emptyMap()));
         });
     }
 }
