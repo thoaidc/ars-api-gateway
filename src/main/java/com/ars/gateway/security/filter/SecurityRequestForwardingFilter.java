@@ -1,6 +1,7 @@
 package com.ars.gateway.security.filter;
 
 import com.ars.gateway.constants.CommonConstants;
+import com.ars.gateway.constants.FilterChainConstants;
 import com.dct.model.common.SecurityUtils;
 import com.dct.model.config.properties.SecurityProps;
 import com.dct.model.constants.BaseSecurityConstants;
@@ -13,7 +14,6 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.web.server.authorization.AuthorizationWebFilter;
@@ -93,6 +93,6 @@ public class SecurityRequestForwardingFilter implements GlobalFilter, Ordered {
     @Override
     public int getOrder() {
         // Set Filter order right after AuthorizationWebFilter
-        return SecurityWebFiltersOrder.AUTHORIZATION.getOrder() + 1;
+        return FilterChainConstants.Order.AFTER_SPRING_DEFAULT_AUTHORIZATION_FILTER;
     }
 }

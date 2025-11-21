@@ -1,5 +1,6 @@
 package com.ars.gateway.security.ratelimiter;
 
+import com.ars.gateway.common.LocaleUtils;
 import com.ars.gateway.constants.ExceptionConstants;
 import com.dct.model.common.JsonUtils;
 import com.dct.model.common.MessageTranslationUtils;
@@ -22,7 +23,6 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Locale;
 import java.util.Objects;
 
 import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.setResponseStatus;
@@ -48,11 +48,11 @@ import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.s
  *           predicates:
  *             - Path=/authenticate
  *           filters:
- *             - name: CustomRateLimiter
+ *             - name: {@link CustomRateLimiter}
  *               args:
- *                 rate-limiter.replenishRate: 30
- *                 rate-limiter.burstCapacity: 50
- *                 rate-limiter.requestedTokens: 1
+ *                 rate-limiter.banThreshold: 10
+ *                 rate-limiter.windowSeconds: 1
+ *                 rate-limiter.banDurationMinutes: 10
  * </pre>
  *
  * <p> With this configuration, the factory ensures the route applies custom rate limiting rules
@@ -120,12 +120,12 @@ public class CustomRateLimiterGatewayFilterFactory extends AbstractGatewayFilter
     }
 
     private Mono<Void> convertResponse(ServerWebExchange exchange) {
+        LocaleUtils.setLocale(exchange);
         ServerHttpResponse response = exchange.getResponse();
-        Locale locale = exchange.getLocaleContext().getLocale();
         BaseResponseDTO.Builder responseBuilder = BaseResponseDTO.builder()
                 .code(HttpStatus.TOO_MANY_REQUESTS.value())
                 .success(Boolean.FALSE)
-                .message(messageTranslationUtils.getMessageI18n(locale, ExceptionConstants.TOO_MANY_REQUESTS));
+                .message(messageTranslationUtils.getMessageI18n(ExceptionConstants.TOO_MANY_REQUESTS));
         String responseBody = JsonUtils.toJsonString(responseBuilder.build());
         DataBuffer buffer = response.bufferFactory().wrap(responseBody.getBytes(StandardCharsets.UTF_8));
         return response.writeWith(Mono.just(buffer));
