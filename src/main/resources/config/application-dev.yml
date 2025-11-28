@@ -105,7 +105,7 @@ spring:
         - id: product-service-route
           uri: lb://PRODUCT-SERVICE
           predicates:
-            - Path=/api/v1/products/**, /api/p/v1/products/**
+            - Path=/api/v1/products/**, /api/p/v1/products/**, /uploads/products/**
           filters:
             - RemoveRequestHeader=Cookie
             - RemoveRequestHeader=Set-Cookie
@@ -225,6 +225,7 @@ app:
       - /api/p/**
       - /login/**
       - /ws/**
+      - /uploads/**
     jwt:
       access-token:
         base64-secret-key: ZGN0LWJhc2Utc2VjcmV0LWtleS1mb3ItYWNjZXNzLXRva2VuLXZhbGlkYXRpb24=

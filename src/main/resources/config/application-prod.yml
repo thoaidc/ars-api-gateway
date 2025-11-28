@@ -224,6 +224,7 @@ app:
       - /api/p/**
       - /login/**
       - /ws/**
+      - /uploads/**
     jwt:
       access-token:
         base64-secret-key: ${ARS_GATEWAY_SECURITY_KEY}
