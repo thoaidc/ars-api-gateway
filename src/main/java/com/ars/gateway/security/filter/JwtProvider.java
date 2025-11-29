@@ -46,8 +46,9 @@ public class JwtProvider extends AbstractJwtProvider {
             String username = (String) claims.get(BaseSecurityConstants.TOKEN_PAYLOAD.USERNAME);
             String authoritiesStr = (String) claims.get(BaseSecurityConstants.TOKEN_PAYLOAD.AUTHORITIES);
             Set<String> authorities = Arrays.stream(authoritiesStr.split(","))
-                    .map(String::trim).
-                    collect(Collectors.toSet());
+                    .map(String::trim)
+                    .filter(StringUtils::hasText)
+                    .collect(Collectors.toSet());
 
             return BaseUserDTO.userBuilder()
                     .withId(userId)
