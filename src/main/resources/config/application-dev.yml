@@ -105,7 +105,7 @@ spring:
         - id: product-service-route
           uri: lb://PRODUCT-SERVICE
           predicates:
-            - Path=/api/v1/products/**, /api/p/v1/products/**, /uploads/products/**
+            - Path=/api/v1/products/**, /api/p/v1/products/**, /uploads/products/**, /api/v1/shops/**, /api/p/v1/shops/**
           filters:
             - RemoveRequestHeader=Cookie
             - RemoveRequestHeader=Set-Cookie
@@ -118,7 +118,7 @@ spring:
         - id: order-service-route
           uri: lb://ORDER-SERVICE
           predicates:
-            - Path=/api/v1/orders/**, /api/p/v1/orders/**
+            - Path=/api/v1/orders/**, /api/p/v1/orders/**, /api/v1/carts/**
           filters:
             - RemoveRequestHeader=Cookie
             - RemoveRequestHeader=Set-Cookie
