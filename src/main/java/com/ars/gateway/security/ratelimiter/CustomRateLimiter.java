@@ -14,6 +14,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
@@ -63,23 +64,23 @@ public class CustomRateLimiter extends AbstractRateLimiter<RateLimiterConfig> {
     /**
      * Checks whether the client is allowed to make a request.
      *
-     * @param routeId The route ID to fetch the rate limit configuration.
-     * @param id      The client identifier (e.g., userId, IP) to distinguish clients.
+     * @param routeId   The route ID to fetch the rate limit configuration.
+     * @param clientKey The client identifier (e.g., userId, IP) to distinguish clients.
      * @return Mono<Response> containing {@code allowed = true/false} and optional metadata.
      */
-    @Override
-    public Mono<Response> isAllowed(String routeId, String id) {
+    public Mono<Response> isAllowed(ServerWebExchange exchange, String routeId, String clientKey) {
         return Mono.fromCallable(() -> {
             String[] excludedApis = rateLimitExcludedApis.getOrDefault(RATE_LIMIT_EXCLUDED_APIS, defaultExcludedApis);
+            String requestPath = exchange.getRequest().getURI().getPath();
 
-            if (SecurityUtils.checkPathMatches(routeId, excludedApis)) {
+            if (SecurityUtils.checkPathMatches(requestPath, excludedApis)) {
                 return new Response(RateLimitConstants.REQUEST_ALLOWED, Collections.emptyMap());
             }
 
             // Retrieve the rate limiter configuration for this route
             RateLimiterConfig rateLimiterConfig = rateLimiterConfigs.getOrDefault(routeId, getConfig().get(routeId));
             // Redis key to mark temporarily banned clients
-            String clientBanned = RateLimitConstants.BAN_KEY_PREFIX + id;
+            String clientBanned = RateLimitConstants.BAN_KEY_PREFIX + clientKey;
 
             // If the client is currently banned, return not allowed
             if (redisTemplate.hasKey(clientBanned)) {
@@ -88,12 +89,12 @@ public class CustomRateLimiter extends AbstractRateLimiter<RateLimiterConfig> {
             }
 
             // Redis key to count requests within a fixed window
-            String requestRateLimitKey = RateLimitConstants.RATE_LIMIT_KEY + routeId + ":" + id;
+            String requestRateLimitKey = RateLimitConstants.RATE_LIMIT_KEY + routeId + ":" + clientKey;
             // Atomic increment + expire using Lua script. Set the window expiration (e.g., 1 seconds)
             Long requestCounted = redisTemplate.execute(
-                rateLimitScript,
-                Collections.singletonList(requestRateLimitKey),
-                String.valueOf(rateLimiterConfig.getWindowSeconds())
+                    rateLimitScript,
+                    Collections.singletonList(requestRateLimitKey),
+                    String.valueOf(rateLimiterConfig.getWindowSeconds())
             );
 
             // If the request count exceeds the threshold, ban the client temporarily
@@ -110,5 +111,17 @@ public class CustomRateLimiter extends AbstractRateLimiter<RateLimiterConfig> {
             log.error("[RATE_LIMITER_REDIS_ERROR] - Allowed requests because Redis error: {}", exception.getMessage());
             return Mono.just(new Response(RateLimitConstants.REQUEST_ALLOWED, Collections.emptyMap()));
         });
+    }
+
+    /**
+     * Checks whether the client is allowed to make a request.
+     *
+     * @param routeId   The route ID to fetch the rate limit configuration.
+     * @param clientKey The client identifier (e.g., userId, IP) to distinguish clients.
+     * @return Mono<Response> containing {@code allowed = true/false} and optional metadata.
+     */
+    @Override
+    public Mono<Response> isAllowed(String routeId, String clientKey) {
+        return Mono.fromCallable(() -> new Response(RateLimitConstants.REQUEST_ALLOWED, Collections.emptyMap()));
     }
 }

@@ -105,7 +105,7 @@ public class CustomRateLimiterGatewayFilterFactory extends AbstractGatewayFilter
         Route route = exchange.getAttribute(ServerWebExchangeUtils.GATEWAY_ROUTE_ATTR);
         String routeId = Objects.requireNonNull(route).getId();
 
-        return this.customRateLimiter.isAllowed(routeId, key).flatMap(response -> {
+        return this.customRateLimiter.isAllowed(exchange, routeId, key).flatMap(response -> {
             HttpHeaders headers = exchange.getResponse().getHeaders();
             headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
             response.getHeaders().forEach(headers::add);
