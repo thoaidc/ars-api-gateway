@@ -225,6 +225,8 @@ app:
       - /login/**
       - /ws/**
       - /uploads/**
+      - /api/v1/payments/webhook/payos
+      - /
     jwt:
       access-token:
         base64-secret-key: ${ARS_GATEWAY_SECURITY_KEY}
