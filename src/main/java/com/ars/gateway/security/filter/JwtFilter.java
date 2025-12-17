@@ -4,6 +4,7 @@ import com.ars.gateway.constants.CommonConstants;
 import com.ars.gateway.security.config.DynamicPublicRequestContext;
 import com.dct.model.common.JsonUtils;
 import com.dct.model.common.SecurityUtils;
+import com.dct.model.constants.BaseExceptionConstants;
 import com.dct.model.constants.BaseHttpStatusConstants;
 import com.dct.model.dto.auth.BaseUserDTO;
 import com.dct.model.dto.response.BaseResponseDTO;
@@ -22,6 +23,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
@@ -51,7 +53,10 @@ public class JwtFilter implements WebFilter {
         }
 
         String token = SecurityUtils.retrieveTokenWebFlux(exchange.getRequest());
-        exchange.getAttributes().put(CommonConstants.TOKEN_EXCHANGE_ATTRIBUTE, token);
+
+        if (StringUtils.hasText(token)) {
+            exchange.getAttributes().put(CommonConstants.TOKEN_EXCHANGE_ATTRIBUTE, token);
+        }
 
         return jwtProvider.validateToken(token)
                 .flatMap(userDTO -> setAuthentication(exchange, chain, userDTO))
@@ -64,7 +69,6 @@ public class JwtFilter implements WebFilter {
             userDTO.getUsername(),
             userDTO.getAuthorities()
         );
-        System.out.println(userDTO.getAuthorities());
         exchange.getAttributes().put(CommonConstants.AUTHENTICATION_EXCHANGE_ATTRIBUTE, userDTO);
         return chain.filter(exchange).contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication));
     }
@@ -79,7 +83,7 @@ public class JwtFilter implements WebFilter {
             BaseResponseDTO responseDTO = BaseResponseDTO.builder()
                     .code(BaseHttpStatusConstants.UNAUTHORIZED)
                     .success(Boolean.FALSE)
-                    .message("Unauthorized request! Your token was invalid or expired.")
+                    .message(BaseExceptionConstants.UNAUTHORIZED)
                     .build();
             String responseBody = JsonUtils.toJsonString(responseDTO);
             DataBuffer buffer = response.bufferFactory().wrap(responseBody.getBytes(StandardCharsets.UTF_8));

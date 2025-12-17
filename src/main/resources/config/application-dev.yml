@@ -241,9 +241,8 @@ app:
     activate: enabled
     patterns:
       '[/**]':
-        allowedOrigins:
-          - "http://localhost:4200"
-          - "http://localhost:8080"
+        allowed-origin-patterns:
+          - "*"
         allowedMethods:
           - GET
           - POST
