@@ -129,7 +129,7 @@ spring:
         - id: payment-service-route
           uri: lb://PAYMENT-SERVICE
           predicates:
-            - Path=/api/v1/payments/**, /api/p/v1/payments/**
+            - Path=/api/v1/payments/**, /api/p/v1/payments/**, /api/v1/balances/**
           filters:
             - RemoveRequestHeader=Cookie
             - RemoveRequestHeader=Set-Cookie
