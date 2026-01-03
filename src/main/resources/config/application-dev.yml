@@ -54,7 +54,7 @@ spring:
           # With traffic of about 500 requests/s per backend instance and average latency of ~500ms,
           # acquire-timeout = 3s ensures that requests wait for a free connection in the pool for up to 3s
           # before failing, enough for most requests to be processed without disconnection or error
-          acquire-timeout: 3
+          acquire-timeout: 3000
 
       # Global request filters
       default-filters:
@@ -229,6 +229,7 @@ app:
       - /ws/**
       - /uploads/**
       - /api/v1/payments/webhook/payos
+      - /actuator/prometheus
       - /
     jwt:
       access-token:

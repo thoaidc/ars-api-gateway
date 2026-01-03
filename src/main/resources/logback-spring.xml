@@ -5,9 +5,20 @@
     <!-- Include custom config from dct-starter-model FIRST -->
     <include resource="logback/base.xml"/>
 
+    <appender name="logstash" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <param name="Encoding" value="UTF-8"/>
+        <destination>localhost:5044</destination>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"app_name":"com.ars.gateway", "server_name":"${HOSTNAME}"}</customFields>
+        </encoder>
+        <writeTimeout>1 minute</writeTimeout>
+        <keepAliveDuration>5 minutes</keepAliveDuration>
+    </appender>
+
     <root>
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
+        <appender-ref ref="logstash"/>
     </root>
 
     <!-- Override/add your own logger below if needed -->
