@@ -105,7 +105,59 @@ spring:
         - id: product-service-route
           uri: lb://PRODUCT-SERVICE
           predicates:
-            - Path=/api/v1/products/**, /api/p/v1/products/**, /uploads/products/**, /api/v1/shops/**, /api/p/v1/shops/**, /api/v1/vouchers/**, /api/p/v1/vouchers/**
+            - Path=/api/v1/products/**, /api/p/v1/products/**, /uploads/products/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 20
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
+
+        - id: product-reviews-route
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/api/v1/reviews/**, /api/p/v1/reviews/**, /uploads/reviews/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 20
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
+
+        - id: shops-route
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/api/v1/shops/**, /api/p/v1/shops/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 20
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
+
+        - id: vouchers-route
+          uri: lb://PRODUCT-SERVICE
+          predicates:
+            - Path=/api/v1/vouchers/**, /api/p/v1/vouchers/**
+          filters:
+            - RemoveRequestHeader=Cookie
+            - RemoveRequestHeader=Set-Cookie
+            - name: CustomRateLimiter
+              args:
+                rate-limiter.banThreshold: 20
+                rate-limiter.windowSeconds: 1
+                rate-limiter.banDurationMinutes: 10
+
+        - id: carts-route
+          uri: lb://ORDER-SERVICE
+          predicates:
+            - Path=/api/v1/carts/**
           filters:
             - RemoveRequestHeader=Cookie
             - RemoveRequestHeader=Set-Cookie
@@ -118,7 +170,7 @@ spring:
         - id: order-service-route
           uri: lb://ORDER-SERVICE
           predicates:
-            - Path=/api/v1/orders/**, /api/p/v1/orders/**, /api/v1/carts/**
+            - Path=/api/v1/orders/**, /api/p/v1/orders/**
           filters:
             - RemoveRequestHeader=Cookie
             - RemoveRequestHeader=Set-Cookie
@@ -144,7 +196,7 @@ spring:
         - id: notification-service-route
           uri: lb://NOTIFICATION-SERVICE
           predicates:
-            - Path=/api/v1/notifications/**, /api/p/v1/notifications/**
+            - Path=/api/v1/notifications/**, /api/p/v1/notifications/**, /uploads/notifications/**
           filters:
             - RemoveRequestHeader=Cookie
             - RemoveRequestHeader=Set-Cookie
