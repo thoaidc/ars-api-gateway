@@ -274,6 +274,7 @@ app:
     rate-limit-excluded-apis:
       - /favicon.ico
       - /uploads/**
+      - /api/v1/notifications/chats/**
     public-request-patterns:
       - /favicon.ico
       - /api/p/**
@@ -282,6 +283,7 @@ app:
       - /uploads/**
       - /api/v1/payments/webhook/payos
       - /actuator/prometheus
+      - /api/v1/notifications/chats/**
       - /
     jwt:
       access-token:
