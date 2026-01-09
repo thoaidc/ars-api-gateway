@@ -39,10 +39,10 @@ spring:
       httpclient:
         # Maximum time (in milliseconds) Gateway waits to open a TCP connection to downstream services
         # This only counts the TCP handshake phase, not the API response time
-        connect-timeout: 2000
+        connect-timeout: 20000
         # Maximum time Gateway waits for response from downstream services after request has been sent successfully
         # If downstream services does not respond within this time → Gateway disconnects, returns error 504 GATEWAY_TIMEOUT
-        response-timeout: 5s
+        response-timeout: 50s
         pool:
           # Maximum number of TCP connections the Gateway can hold open simultaneously to downstream services
           # Reactor Netty uses a connection pool (reuses keep-alive connections) to avoid the overhead of opening new connections
@@ -54,7 +54,7 @@ spring:
           # With traffic of about 500 requests/s per backend instance and average latency of ~500ms,
           # acquire-timeout = 3s ensures that requests wait for a free connection in the pool for up to 3s
           # before failing, enough for most requests to be processed without disconnection or error
-          acquire-timeout: 3000
+          acquire-timeout: 5000
 
       # Global request filters
       default-filters:
@@ -85,7 +85,7 @@ spring:
           filters:
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
@@ -98,7 +98,7 @@ spring:
             - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
@@ -111,7 +111,7 @@ spring:
             - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
@@ -124,7 +124,7 @@ spring:
             - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
@@ -137,7 +137,7 @@ spring:
             - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
@@ -150,7 +150,7 @@ spring:
             - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
@@ -163,7 +163,7 @@ spring:
             - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
@@ -176,7 +176,7 @@ spring:
             - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
@@ -189,7 +189,7 @@ spring:
             - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
@@ -202,7 +202,7 @@ spring:
             - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
@@ -215,7 +215,7 @@ spring:
             - RemoveRequestHeader=Set-Cookie
             - name: CustomRateLimiter
               args:
-                rate-limiter.banThreshold: 20
+                rate-limiter.banThreshold: 100
                 rate-limiter.windowSeconds: 1
                 rate-limiter.banDurationMinutes: 10
 
